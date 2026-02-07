@@ -81,7 +81,10 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 }*/
 
+char last_cmd_display[64] = "None"; // Buffer to keep last command visible on OLED
+
 void process_command(char *cmd) {
+    snprintf(last_cmd_display, sizeof(last_cmd_display), "%s", cmd);
     if (strncmp(cmd, "drive(", 6) == 0) {
         float target_cm;
         int base_pwm;
@@ -92,21 +95,21 @@ void process_command(char *cmd) {
 
             char msg[64];
             snprintf(msg, sizeof(msg), "Driving %.2f cm at PWM %d\r\n", target_cm, base_pwm);
-            HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
         } else {
             char err[] = "ERR: bad drive args\r\n";
-            HAL_UART_Transmit(&huart2, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
         }
 
     } else if (strncmp(cmd, "stop", 4) == 0) {
         Motor_stop();
         char msg[] = "Stopped\r\n";
-        HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
 
     } else {
         char err[64];
         snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
-        HAL_UART_Transmit(&huart2, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+        HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
     }
 }
 
@@ -828,6 +831,20 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual)
     return Steering_ToUS(current_angle);
 }
 
+
+/**
+ * @brief Rotates the robot to a target relative angle using gyroscope feedback.
+ * 
+ * This function sets the steering to a specified angle and drives the motors
+ * until the integrated yaw angle reaches the target. It includes local gyro
+ * bias calibration, speed ramping as the target is approached, an obstacle
+ * detection safety check, and a 15-second timeout.
+ * 
+ * @param target_deg The relative angle to rotate by (degrees).
+ * @param pwmVal The base PWM speed for the rotation.
+ * @param steer_angle The steering servo angle during the turn [-45 to 45].
+ */
+
 void Rotate_Angle(float target_deg, int pwmVal, int steer_angle)
 {
     // Safety check on steering angle
@@ -1111,7 +1128,7 @@ int main(void)
   //Rotate_Angle(90.0f, 2500, 40);
   //Drive_Straight_ToCM(100.0f, 3000); // Test straight driving
   //HAL_Delay(1000);
-  Rotate_Angle(180.0f, 2500, 40);     // Test rotation
+  //Rotate_Angle(180.0f, 2500, 40);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   //Rotate_Angle(-180.0f, 2500, -5);
 
@@ -1124,7 +1141,7 @@ int main(void)
   while (1){
 	// Below section is for the RPI command unloading and execution
 	uint8_t ch;
-	if (HAL_UART_Receive(&huart2, &ch, 1, 10) == HAL_OK) {
+	if (HAL_UART_Receive(&huart3, &ch, 1, 10) == HAL_OK) {
 		  if (ch == '\n' || ch == '\r') {
 			  if (cmd_index > 0) {cmd_buf[cmd_index] = '\0';
 			  	  process_command(cmd_buf);
@@ -1199,20 +1216,24 @@ int main(void)
     OLED_Clear();
 
     // Accelerometer all in one line
-    sprintf(buf, "AX=%.2f AY=%.2f AZ=%.2f", ax_g, ay_g, az_g);
-    OLED_ShowString(0, 0, (uint8_t*)buf);
+    // sprintf(buf, "AX=%.2f AY=%.2f AZ=%.2f", ax_g, ay_g, az_g);
+    // OLED_ShowString(0, 0, (uint8_t*)buf);
 
-    // Gyroscope all in one line
-    sprintf(buf, "GX=%.1f GY=%.1f GZ=%.1f", gx_dps, gy_dps, gz_dps);
-    OLED_ShowString(0, 10, (uint8_t*)buf);
+    // // Gyroscope all in one line
+    // sprintf(buf, "GX=%.1f GY=%.1f GZ=%.1f", gx_dps, gy_dps, gz_dps);
+    // OLED_ShowString(0, 10, (uint8_t*)buf);
 
 //    // Encoder A
 //    sprintf(buf, "A: %.2f cm", distA_cm);
 //    OLED_ShowString(0, 20, (uint8_t*)buf);
-//
-//    // Encoder D
-//    sprintf(buf, "D: %.2f cm", distD_cm);
-//    OLED_ShowString(0, 30, (uint8_t*)buf);
+
+// //    // Encoder D
+//     sprintf(buf, "D: %.2f cm", distD_cm);
+//     OLED_ShowString(0, 30, (uint8_t*)buf);
+
+    // Display the last received command
+    sprintf(buf, "Last: %s", last_cmd_display);
+    OLED_ShowString(0, 40, (uint8_t*)buf);
 
     // Refresh OLED
     OLED_Refresh_Gram();

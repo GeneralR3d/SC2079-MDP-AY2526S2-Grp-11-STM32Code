@@ -85,12 +85,12 @@ char last_cmd_display[64] = "None"; // Buffer to keep last command visible on OL
 
 void process_command(char *cmd) {
     snprintf(last_cmd_display, sizeof(last_cmd_display), "%s", cmd);
-    if (strncmp(cmd, "drive(", 6) == 0) {
+    if (strncmp(cmd, "d(", 2) == 0) {
         float target_cm;
         int base_pwm;
 
-        // Expect: drive(50,200)
-        if (sscanf(cmd + 6, "%f,%d", &target_cm, &base_pwm) == 2) {
+        // Expect: d(50,200)
+        if (sscanf(cmd + 2, "%f,%d", &target_cm, &base_pwm) == 2) {
             Drive_Straight_ToCM(target_cm, base_pwm);
 
             char msg[64];
@@ -98,6 +98,22 @@ void process_command(char *cmd) {
             HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
         } else {
             char err[] = "ERR: bad drive args\r\n";
+            HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+        }
+
+    } else if (strncmp(cmd, "r(", 2) == 0) {
+        float target_deg;
+        int pwm, steer;
+
+        // Expect: r(90,2500,40)
+        if (sscanf(cmd + 2, "%f,%d,%d", &target_deg, &pwm, &steer) == 3) {
+            Rotate_Angle(target_deg, pwm, steer);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "Rotated %.2f deg at PWM %d\r\n", target_deg, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+        } else {
+            char err[] = "ERR: bad rotate args\r\n";
             HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
         }
 
@@ -1126,9 +1142,9 @@ int main(void)
   //Servo_WriteUS(1500); // Center position (90 degrees)
   //HAL_Delay(200);
   //Rotate_Angle(90.0f, 2500, 40);
-  //Drive_Straight_ToCM(100.0f, 3000); // Test straight driving
+  Drive_Straight_ToCM(100.0f, 3000); // Test straight driving
   //HAL_Delay(1000);
-  //Rotate_Angle(180.0f, 2500, 40);     // Test rotation
+  Rotate_Angle(180.0f, 2500, 40);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   //Rotate_Angle(-180.0f, 2500, -5);
 
@@ -1172,7 +1188,7 @@ int main(void)
 	//straight driving code
 	//Drive_Straight_ToCM(20.0f, 3000); // go 100 cm straight, PWM=3000
 
-	//target rotation
+	//target rotation 
 //	Rotate_Angle(90.0f, 2500, 25);   // rotate ~90° with servo at 25°
 //	Rotate_Angle(180.0f, 2500, 25);  // rotate ~180°
 
@@ -1231,9 +1247,7 @@ int main(void)
 //     sprintf(buf, "D: %.2f cm", distD_cm);
 //     OLED_ShowString(0, 30, (uint8_t*)buf);
 
-    // Display the last received command
-    sprintf(buf, "Last: %s", last_cmd_display);
-    OLED_ShowString(0, 40, (uint8_t*)buf);
+
 
     // Refresh OLED
     OLED_Refresh_Gram();
@@ -1242,7 +1256,8 @@ int main(void)
 //    sprintf(buf, "RPM: %d", rpm);
 //    OLED_ShowString(0, 20, (uint8_t*)buf);
 //    OLED_Refresh_Gram();
-    HAL_UART_Transmit(&huart3, (uint8_t *)buf, strlen(buf), HAL_MAX_DELAY);
+    // HAL_UART_Transmit(&huart3, (uint8_t *)buf, strlen(buf), HAL_MAX_DELAY);
+    // HAL_Delay(500);
 
     HAL_GPIO_TogglePin(GPIOA, LED_Pin);
     HAL_Delay(500);

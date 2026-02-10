@@ -483,11 +483,13 @@ static inline void reset_encoders(void) {
 }
 
 // average distance using the calibrated scales
-static float cm_travelled(void) {
-  // Use your friend's calibrated values or adjust as needed
-  static float COUNTS_PER_CM_L = 76.70f;
-  static float COUNTS_PER_CM_R = 80.87f;
+// if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be smaller
+// if actual < measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be larger
 
+const float COUNTS_PER_CM_L = 95.0f;
+const float COUNTS_PER_CM_R = 80.0f;
+
+static float cm_travelled(void) {
   float cmL = (float)left_ticks()  / COUNTS_PER_CM_L;
   float cmR = (float)right_ticks() / COUNTS_PER_CM_R;
   return 0.5f * (cmL + cmR);
@@ -997,6 +999,53 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
 
 
 
+void Measure_Motor_Speed(int pwmVal)
+{
+    char buf[64];
+    reset_encoders();
+
+    uint32_t last_tick = HAL_GetTick();
+    int32_t last_left = left_ticks();
+    int32_t last_right = right_ticks();
+
+    // Display initial message
+    OLED_Clear();
+    sprintf(buf, "RPM Test PWM=%d", pwmVal);
+    OLED_ShowString(0, 0, (uint8_t*)buf);
+    OLED_Refresh_Gram();
+
+    // Start motors
+    Motor_forward(pwmVal);
+
+    while(1) {
+        if (HAL_GetTick() - last_tick >= 100) {
+            int32_t current_left = left_ticks();
+            int32_t current_right = right_ticks();
+
+            int32_t delta_left = current_left - last_left;
+            int32_t delta_right = current_right - last_right;
+
+            // Update last values
+            last_tick = HAL_GetTick();
+            last_left = current_left;
+            last_right = current_right;
+            
+            float cm_curr_left = (float)delta_left / COUNTS_PER_CM_L;
+            float cm_curr_right = (float)delta_right / COUNTS_PER_CM_R;
+
+            // Print to UART (Serial Monitor)
+            // Format: "PWM: <pwm> | L: <cm> | R: <cm>\r\n"
+            sprintf(buf, "PWM:%d L:%.2f R:%.2f\r\n", pwmVal, cm_curr_left, cm_curr_right);
+            HAL_UART_Transmit(&huart3, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
+
+            // Optional: Print to OLED for convenience
+            sprintf(buf, "L:%.1f R:%.1f   ", cm_curr_left, cm_curr_right);
+            OLED_ShowString(0, 20, (uint8_t*)buf);
+            OLED_Refresh_Gram();
+        }
+    }
+}
+
 /* USER CODE END 0 */
 
 /**
@@ -1142,9 +1191,16 @@ int main(void)
   //Servo_WriteUS(1500); // Center position (90 degrees)
   //HAL_Delay(200);
   //Rotate_Angle(90.0f, 2500, 40);
-  Drive_Straight_ToCM(100.0f, 3000); // Test straight driving
+  //Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
   //HAL_Delay(1000);
-  Rotate_Angle(180.0f, 2500, 40);     // Test rotation
+  //Drive_Straight_ToCM(100.0f, 2000);
+  //HAL_Delay(1000);
+  //Drive_Straight_ToCM(100.0f, 2500);
+  //HAL_Delay(1000);
+  //Drive_Straight_ToCM(100.0f, 3000);
+
+  Measure_Motor_Speed(1500); // Live RPM Comparison
+  //Rotate_Angle(180.0f, 2500, 40);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   //Rotate_Angle(-180.0f, 2500, -5);
 

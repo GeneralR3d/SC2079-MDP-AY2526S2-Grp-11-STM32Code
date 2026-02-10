@@ -33,7 +33,7 @@ static inline void Servo_WriteUS(uint16_t us)
 }
 
 // Global servo center position (can be tweaked)
-volatile int32_t SERVO_CENTER_US = 1150;
+volatile int32_t SERVO_CENTER_US = 1500;
 
 /**
  * @brief Map steering direction (deg) to servo PWM microsecond value
@@ -279,7 +279,7 @@ void Motor_direction(uint8_t forward)
 
 
 //THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
-/*void Motor_forward(int pwmVal)
+void Motor_forward(int pwmVal)
 {
   // --- Static variables persist across calls ---
   static uint32_t last_time = 0;
@@ -330,7 +330,7 @@ void Motor_direction(uint8_t forward)
   if (correction < -2000) correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-  int left_offset  = -200;
+  int left_offset  = -350;
   int right_offset = 0;
 
   // --- Apply correction + offsets ---
@@ -356,18 +356,18 @@ void Motor_direction(uint8_t forward)
   // sprintf(buf, "Err=%.2f Corr=%d L=%d R=%d\r\n",
   //         heading_error, correction, left_pwm, right_pwm);
   // HAL_UART_Transmit(&huart3, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
-}*/
+}
 
 //simple motor forward code - no pid control
-void Motor_forward(int pwmVal) {
-    // Motor A (left)
-    __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
-    __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
+// void Motor_forward(int pwmVal) {
+//     // Motor A (left)
+//     __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
+//     __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
 
-    // Motor D (right) - adjust if your motors are wired differently
-    __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
-    __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
-}
+//     // Motor D (right) - adjust if your motors are wired differently
+//     __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
+//     __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
+// }
 
 
 void Motor_reverse(int pwmVal)
@@ -817,11 +817,6 @@ void Update_Yaw(void)
 }
 
 /**
- * @brief Set servo angle with safety limits
- * @param angle_deg: Angle in degrees [-45 to +45]
- * @return uint16_t: Actual pulse width in microseconds sent to servo
- */
-/**
  * @brief Set servo angle with enhanced safety features
  * @param angle_deg: Angle in degrees [-45 to +45]
  * @param gradual: If true, move gradually to prevent sudden movements
@@ -1181,16 +1176,10 @@ int main(void)
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
 
-  Drive_Straight_ToCM(100.0f, 3000); // go 100 cm straight, PWM=3000
+  //Drive_Straight_ToCM(100.0f, 3000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
-  //Steering_ToUS(16);HAL_Delay(800);
-  //Motor_forward(3000);
-  //HAL_Delay(3000);
-  //Motor_stop();
-  //Servo_SetAngle_Safe(0, 1); // gradual return to center
-  //HAL_Delay(200);
-  Rotate_Angle(90.0f, 2500, 40);
-  Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
+  //Rotate_Angle(90.0f, 2500, 40);
+  //Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
   //HAL_Delay(1000);
   //Drive_Straight_ToCM(100.0f, 2000);
   //HAL_Delay(1000);

@@ -507,6 +507,7 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
   return v;
 }
 
+// IR sensor 5 calibration
 static inline float dist_cm_from_mv_5(uint32_t mv)
 {
   const float A = 104.0f;         // mV
@@ -522,6 +523,7 @@ static inline float dist_cm_from_mv_5(uint32_t mv)
   return d;
 }
 
+// IR sensor 4 calibration
 static inline float dist_cm_from_mv_4(uint32_t mv)
 {
   const float A = 45.22f;         // mV
@@ -669,26 +671,7 @@ uint32_t HCSR04_Read(void)
     return (uint32_t)((time_us * 343) / 20000);  // optimized integer math
 }
 
-//function codes
-//old drive straight code
-//void Drive_Straight_ToCM(float target_cm, int pwmVal) {
-//    Encoder_Reset();
-//
-//    int32_t target_counts = (int32_t)((target_cm / WHEEL_CIRCUM) * ENCODER_CPR);
-//
-//    while (1) {
-//        int32_t countsA = __HAL_TIM_GET_COUNTER(&htim2);
-//        int32_t countsD = __HAL_TIM_GET_COUNTER(&htim5);
-//        int32_t avg_counts = (countsA + countsD) / 2;
-//
-//        if (avg_counts >= target_counts) {
-//            Motor_stop();
-//            break;
-//        } else {
-//            Motor_forward(pwmVal);
-//        }
-//    }
-//}
+
 
 #define STRAIGHT_KP 0.8f    // Proportional gain for steering correction
 #define STRAIGHT_KI 0.05f   // Integral gain for steering correction

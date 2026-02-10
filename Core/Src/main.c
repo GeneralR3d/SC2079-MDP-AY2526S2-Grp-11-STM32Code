@@ -21,9 +21,10 @@ UART_HandleTypeDef huart3;
 
 Safety: Clamps values between 500-2500μs to prevent servo damage
 Hardware: Uses TIM12, Channel 2 for PWM generation
-Range: Standard servo range (500μs = 0°, 1500μs = 90°, 2500μs = 180°)*/
+Range: Standard servo range (500μs = 0°, 1500μs = 90°, 2500μs = 180°)
+LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Servo_ToUS() instead*/
 
-static inline void Servo_WriteUS(uint16_t us)
+static inline void _Servo_WriteUS(uint16_t us)
 {
   if (us < 500)
     us = 500;
@@ -57,7 +58,7 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     
     int32_t us = SERVO_CENTER_US + (int32_t)steer_angle * ( (2400 - 500) / 90 );
 
-    Servo_WriteUS((uint16_t)us);
+    _Servo_WriteUS((uint16_t)us);
     HAL_Delay(100); // Let servo settle
     return (uint16_t)us;
 }
@@ -71,7 +72,7 @@ uint16_t Steering_ToUS(int16_t steer_angle)
         Motor_reverse(d);
     } else if (strncmp(cmd, "servo_us(", 9) == 0) {
         int us = atoi(cmd + 9);
-        Servo_WriteUS((uint16_t)us);
+        _Servo_WriteUS((uint16_t)us);
     } else if (strncmp(cmd, "servo_deg(", 10) == 0) {
         int deg = atoi(cmd + 10);
         Steering_ToUS(deg);
@@ -1294,9 +1295,6 @@ int main(void)
         // Forward fast
         Motor_forward(5000);   // ~60–70 RPM
         HAL_Delay(3000);
-        Servo_WriteUS(2400); HAL_Delay(1000);  // right
-        Servo_WriteUS(1000); HAL_Delay(1000); //centre
-        Servo_WriteUS(500); HAL_Delay(1000); //left
         Motor_reverse(5000);   // ~60–70 RPM
         HAL_Delay(3000);
 

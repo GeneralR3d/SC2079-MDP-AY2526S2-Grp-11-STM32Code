@@ -56,7 +56,17 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     // Linear interpolation using the dynamic center
     // but we want exact 0° = SERVO_CENTER_US, so adjust baseline
 
-    int32_t us = SERVO_CENTER_US + (int32_t)steer_angle * ( (2380 - 950) / 90 );
+    int32_t us;
+    if (steer_angle >= 0) {
+        // Positive range: 0 to +45 deg -> SERVO_CENTER_US to 2380
+        // Slope = (2380 - SERVO_CENTER_US) / 45
+        us = SERVO_CENTER_US + (int32_t)steer_angle * (2380 - SERVO_CENTER_US) / 45;
+    } else {
+        // Negative range: 0 to -45 deg -> SERVO_CENTER_US to 950
+        // Slope = (SERVO_CENTER_US - 950) / 45
+        // Note: steer_angle is negative, so we add (negative * positive_slope) which subtracts
+        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 950) / 45;
+    }
 
     // Transmit steering angle and pulse width via UART
     char msg[64];
@@ -862,15 +872,19 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
     yaw_angle = 0;          // reset yaw integration
     last_time = HAL_GetTick();
 
-    // Calibrate gyro bias (take average of several readings)
-    float gyro_bias = 0;
-    for(int i = 0; i < 10; i++) {
-        int16_t ax, ay, az, gx, gy, gz;
-        ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
-        gyro_bias += gz / 131.0f; // Convert to dps
-        HAL_Delay(10);
-    }
-    gyro_bias /= 10.0f;
+    //     float gyro_bias = 0;
+    // for(int i = 0; i < 10; i++) {
+    //     int16_t ax, ay, az, gx, gy, gz;
+    //     ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+    //     gyro_bias += gz / 131.0f; // Convert to dps
+    //     HAL_Delay(10);
+    // }
+    // gyro_bias /= 10.0f;
+    // Calibrate gyro bias handled globally in main/init
+    // If you want to recalibrate here, you should update the GLOBAL `gyro_z_bias`
+    // but typically one calibration at startup is enough.
+    // For now, we will rely on Update_Yaw using the global bias.
+
 
     // Set steering angle gradually for safety
     Servo_SetAngle_Safe(steer_angle, 1); // gradual movement
@@ -889,19 +903,30 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
         Update_Yaw();
 
         // Apply gyro bias correction
-        yaw_angle -= gyro_bias * (HAL_GetTick() - last_time) / 1000.0f;
+        //yaw_angle -= gyro_bias * (HAL_GetTick() - last_time) / 1000.0f;
+        // NOTE: Update_Yaw() already integrates (gz - gyro_z_bias).
+        // DO NOT subtract bias again here.
+
 
         // Drive with controlled speed (reduce speed as we approach target)
         float progress = fabsf(yaw_angle) / target_deg_abs;
         int current_pwm = pwmVal;
 
         // Slow down when approaching target (optional)
-        if (progress > 0.7f) {
-            current_pwm = pwmVal * 0.5f; // Reduce speed to 50%
+        if (progress > 0.6f) {
+            current_pwm = pwmVal * 0.7f; // Reduce speed to 50%
         }
-        if (progress > 0.9f) {
+        else if (progress > 0.7f) {
             current_pwm = pwmVal * 0.3f; // Reduce speed to 30%
         }
+        else if (progress > 0.8f) {
+            current_pwm = pwmVal * 0.3f; // Reduce speed to 30%
+        }
+        else if (progress > 0.9f) {
+            current_pwm = pwmVal * 0.2f; // Reduce speed to 30%
+        }
+
+//        Motor_forward_simple(current_pwm);
 
         Motor_forward_simple(current_pwm);
 
@@ -1083,7 +1108,7 @@ int main(void)
   MX_TIM11_Init();
   MX_TIM12_Init();
   MX_ADC1_Init();
-  gyro_z_bias = calibrate_gyro_bias();
+  // gyro_z_bias = calibrate_gyro_bias(); // MOVED DOWN after init
   /* USER CODE BEGIN 2 */
 
   MotorDrive_enable();                       // enable PWM needed to drive MotroDrive A and D
@@ -1125,6 +1150,10 @@ int main(void)
   if (ICM20948_Init() == 0)
   {
     sprintf(buf, "ICM OK");
+    // Calibrate AFTER initialization
+    gyro_z_bias = calibrate_gyro_bias();
+    sprintf(buf, "Bias: %.2f", gyro_z_bias);
+    OLED_ShowString(0, 20, (uint8_t *)buf);
   }
   else
   {
@@ -1174,18 +1203,15 @@ int main(void)
 
   //Drive_Straight_ToCM(100.0f, 1000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
-    Turn_Car(90.0f, 2500, 45);
-  HAL_Delay(2000);
-  Turn_Car(90.0f, 2500, -45);
-  HAL_Delay(2000);
-  Turn_Car(180.0f, 2500, 45);
-  HAL_Delay(2000);
-  Turn_Car(180.0f, 2500, -45);
-  HAL_Delay(2000);
-    Turn_Car(360.0f, 2500, 45);
-  HAL_Delay(2000);
-  Turn_Car(360.0f, 2500, -45);
-  HAL_Delay(2000);
+    Turn_Car(90.0f, 1500, 45);
+  HAL_Delay(5000);
+  Turn_Car(90.0f, 1500, -45);
+  HAL_Delay(5000);
+  Turn_Car(360.0f, 1500, 45);
+ HAL_Delay(5000);
+ Turn_Car(360.0f, 1500, -45);
+ HAL_Delay(5000);
+
   
 
 

@@ -32,29 +32,33 @@ static inline void Servo_WriteUS(uint16_t us)
   __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
 }
 
+// Global servo center position (can be tweaked)
+volatile int32_t SERVO_CENTER_US = 1150;
+
 /**
  * @brief Map steering direction (deg) to servo PWM microsecond value
  *
  * User input range:
  *   -45 = Full Left  (500 µs)
- *     0 = Straight   (1150 µs)
+ *     0 = Straight   (SERVO_CENTER_US µs)
  *   +45 = Full Right (2400 µs)
  *
  * @param steer_angle Steering angle in degrees [-45 to +45]
- * @return uint16_t Pulse width in microseconds
+ * Adds a delay 100ms for servo to move
+ * @return uint16_t Pulse widinth in microseconds
  */
 uint16_t Steering_ToUS(int16_t steer_angle)
 {
     if (steer_angle < -45) steer_angle = -45;
     if (steer_angle >  45) steer_angle =  45;
 
-    // Linear interpolation
-    // slope = (2400 - 500) / (45 - (-45)) = 1900 / 90 ≈ 21.111 µs per degree
-    // but we want exact 0° = 1150, so adjust baseline
+    // Linear interpolation using the dynamic center
+    // but we want exact 0° = SERVO_CENTER_US, so adjust baseline
+    
+    int32_t us = SERVO_CENTER_US + (int32_t)steer_angle * ( (2400 - 500) / 90 );
 
-    int32_t us = 1150 + (int32_t)steer_angle * ( (2400 - 500) / 90 );
-
-    __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, (uint16_t)us);
+    Servo_WriteUS((uint16_t)us);
+    HAL_Delay(100); // Let servo settle
     return (uint16_t)us;
 }
 
@@ -486,8 +490,8 @@ static inline void reset_encoders(void) {
 // if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be smaller
 // if actual < measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be larger
 
-const float COUNTS_PER_CM_L = 95.0f;
-const float COUNTS_PER_CM_R = 80.0f;
+const float COUNTS_PER_CM_L = 90.0f;
+const float COUNTS_PER_CM_R = 86.0f;
 
 static float cm_travelled(void) {
   float cmL = (float)left_ticks()  / COUNTS_PER_CM_L;
@@ -933,7 +937,6 @@ void Rotate_Angle(float target_deg, int pwmVal, int steer_angle)
     // Stop & gradually return to center
     Motor_stop();
     Servo_SetAngle_Safe(0, 1); // gradual return to center
-    Servo_WriteUS(1500); //90 degrees
 
     // Final position feedback
     sprintf(buf, "Final: %.1f°", yaw_angle);
@@ -956,7 +959,6 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
         // Phase 1: Move forward until obstacle detected
         // Ensure servo is centered for straight movement
         Servo_SetAngle_Safe(0, 1); // gradual return to center
-        Servo_WriteUS(1500); // Center position (90 degrees)
         HAL_Delay(200); // Let servo settle
 
         // Use the new Drive_Forward_Until_Obstacle function
@@ -981,7 +983,6 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
         OLED_Refresh_Gram();
 
         Servo_SetAngle_Safe(0, 1); // gradual return to center
-        Servo_WriteUS(1500); // Center position (90 degrees)
         HAL_Delay(200);
 
         Rotate_Angle(-180.0f, 2500, -5);
@@ -1179,19 +1180,17 @@ int main(void)
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
-  //Servo_WriteUS(2400); HAL_Delay(1000);  // right
 
-  //Drive_Straight_ToCM(100.0f, 3000); // go 100 cm straight, PWM=3000
+  Drive_Straight_ToCM(100.0f, 3000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
   //Steering_ToUS(16);HAL_Delay(800);
   //Motor_forward(3000);
   //HAL_Delay(3000);
   //Motor_stop();
   //Servo_SetAngle_Safe(0, 1); // gradual return to center
-  //Servo_WriteUS(1500); // Center position (90 degrees)
   //HAL_Delay(200);
-  //Rotate_Angle(90.0f, 2500, 40);
-  //Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
+  Rotate_Angle(90.0f, 2500, 40);
+  Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
   //HAL_Delay(1000);
   //Drive_Straight_ToCM(100.0f, 2000);
   //HAL_Delay(1000);
@@ -1199,7 +1198,7 @@ int main(void)
   //HAL_Delay(1000);
   //Drive_Straight_ToCM(100.0f, 3000);
 
-  Measure_Motor_Speed(1500); // Live RPM Comparison
+  //Measure_Motor_Speed(1500); // Live RPM Comparison
   //Rotate_Angle(180.0f, 2500, 40);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   //Rotate_Angle(-180.0f, 2500, -5);
@@ -1208,7 +1207,6 @@ int main(void)
 	//target rotation
 	//Rotate_Angle(180.0f, 2500, 40);   // rotate ~90° with servo at 40°
   //Servo_SetAngle_Safe(0,1);
-  //Servo_WriteUS(1500); //90 degrees
 //	Rotate_Angle(180.0f, 2500, 25);  // rotate ~180°
   while (1){
 	// Below section is for the RPI command unloading and execution

@@ -68,10 +68,6 @@ uint16_t Steering_ToUS(int16_t steer_angle)
         us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 950) / 45;
     }
 
-    // Transmit steering angle and pulse width via UART
-    char msg[64];
-    sprintf(msg, "STEER:%d US:%ld\r\n", steer_angle, us);
-    HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 10);
 
     _Servo_WriteUS((uint16_t)us);
     return (uint16_t)us;
@@ -108,7 +104,7 @@ void process_command(char *cmd) {
         float target_cm;
         int base_pwm;
 
-        // Expect: d(50,200)
+        // Expect: d(50,2000)
         if (sscanf(cmd + 2, "%f,%d", &target_cm, &base_pwm) == 2) {
             Drive_Straight_ToCM(target_cm, base_pwm);
 
@@ -697,7 +693,7 @@ void Drive_Straight_ToCM(float target_cm, int base_pwm) {
   uint32_t t0 = HAL_GetTick(), lastPrint = 0;
   while (1) {
     // Emergency stop for obstacles
-    if (HCSR04_Read() <= 20) {
+    if (HCSR04_Read() <= 20){
       Motor_stop();
       OLED_ShowString(0, 40, "Obstacle detected!");
       break;
@@ -1203,14 +1199,7 @@ int main(void)
 
   //Drive_Straight_ToCM(100.0f, 1000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
-    Turn_Car(90.0f, 1500, 45);
-  HAL_Delay(5000);
-  Turn_Car(90.0f, 1500, -45);
-  HAL_Delay(5000);
-  Turn_Car(360.0f, 1500, 45);
- HAL_Delay(5000);
- Turn_Car(360.0f, 1500, -45);
- HAL_Delay(5000);
+
 
   
 

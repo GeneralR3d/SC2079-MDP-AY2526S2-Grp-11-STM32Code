@@ -112,7 +112,7 @@ void process_command(char *cmd) {
 
         // Expect: r(90,2500,40)
         if (sscanf(cmd + 2, "%f,%d,%d", &target_deg, &pwm, &steer) == 3) {
-            Rotate_Angle(target_deg, pwm, steer);
+            Turn_Car(target_deg, pwm, steer);
 
             char msg[64];
             snprintf(msg, sizeof(msg), "Rotated %.2f deg at PWM %d\r\n", target_deg, pwm);
@@ -827,7 +827,7 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual)
 
 
 /**
- * @brief Rotates the robot to a target relative angle using gyroscope feedback.
+ * @brief Turns the robot to a target relative angle using gyroscope feedback.
  * 
  * This function sets the steering to a specified angle and drives the motors
  * until the integrated yaw angle reaches the target. It includes local gyro
@@ -835,11 +835,11 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual)
  * detection safety check, and a 15-second timeout.
  * 
  * @param target_deg The relative angle to rotate by (degrees).
- * @param pwmVal The base PWM speed for the rotation.
+ * @param pwmVal The base PWM speed for the turn.
  * @param steer_angle The steering servo angle during the turn [-45 to 45].
  */
 
-void Rotate_Angle(float target_deg, int pwmVal, int steer_angle)
+void Turn_Car(float target_deg, int pwmVal, int steer_angle)
 {
     // Safety check on steering angle
     if (steer_angle < -45) steer_angle = -45;
@@ -945,7 +945,7 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
         HAL_Delay(2700);
         Motor_stop();
         HAL_Delay(200);
-        Rotate_Angle(90.0f, turn_pwm, 40); // 90° right turn
+        Turn_Car(90.0f, turn_pwm, 40); // 90° right turn
         HAL_Delay(500);
 
 
@@ -957,7 +957,7 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
         Servo_SetAngle_Safe(0, 1); // gradual return to center
         HAL_Delay(200);
 
-        Rotate_Angle(-180.0f, 2500, -5);
+        Turn_Car(-180.0f, 2500, -5);
 
         // Sequence complete feedback
         sprintf(buf, "Sequence complete!");
@@ -1155,7 +1155,7 @@ int main(void)
 
   //Drive_Straight_ToCM(100.0f, 3000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
-  //Rotate_Angle(90.0f, 2500, 40);
+  //Turn_Car(90.0f, 2500, 40);
   //Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
   //HAL_Delay(1000);
   //Drive_Straight_ToCM(100.0f, 2000);
@@ -1165,15 +1165,15 @@ int main(void)
   //Drive_Straight_ToCM(100.0f, 3000);
 
   //Measure_Motor_Speed(1500); // Live RPM Comparison
-  //Rotate_Angle(180.0f, 2500, 40);     // Test rotation
+  //Turn_Car(180.0f, 2500, 40);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
-  //Rotate_Angle(-180.0f, 2500, -5);
+  //Turn_Car(-180.0f, 2500, -5);
 
   //heree
 	//target rotation
-	//Rotate_Angle(180.0f, 2500, 40);   // rotate ~90° with servo at 40°
+	//Turn_Car(180.0f, 2500, 40);   // rotate ~90° with servo at 40°
   //Servo_SetAngle_Safe(0,1);
-//	Rotate_Angle(180.0f, 2500, 25);  // rotate ~180°
+//	Turn_Car(180.0f, 2500, 25);  // rotate ~180°
   while (1){
 	// Below section is for the RPI command unloading and execution
 	uint8_t ch;
@@ -1209,8 +1209,8 @@ int main(void)
 	//Drive_Straight_ToCM(20.0f, 3000); // go 100 cm straight, PWM=3000
 
 	//target rotation 
-//	Rotate_Angle(90.0f, 2500, 25);   // rotate ~90° with servo at 25°
-//	Rotate_Angle(180.0f, 2500, 25);  // rotate ~180°
+//	Turn_Car(90.0f, 2500, 25);   // rotate ~90° with servo at 25°
+//	Turn_Car(180.0f, 2500, 25);  // rotate ~180°
 
 
     int16_t ax, ay, az, gx, gy, gz;

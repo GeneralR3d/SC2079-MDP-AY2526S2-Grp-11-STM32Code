@@ -225,6 +225,7 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
+// boot function for motor drive
 void MotorDrive_enable(void)
 {
   // Enable PWM through TIM4-CH1/CH4 to drive the DC motor - Rev D board
@@ -262,7 +263,7 @@ void Motor_direction(uint8_t forward)
     __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
   }
 }
-
+//simple motor forward code - no pid control
 //void Motor_forward(int pwmVal)
 //{
 //  // Motor A: PWM on CH3, CH4 = 0
@@ -359,15 +360,7 @@ void Motor_forward(int pwmVal)
 }
 
 //simple motor forward code - no pid control
-// void Motor_forward(int pwmVal) {
-//     // Motor A (left)
-//     __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
-//     __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
 
-//     // Motor D (right) - adjust if your motors are wired differently
-//     __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
-//     __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
-// }
 
 
 void Motor_reverse(int pwmVal)

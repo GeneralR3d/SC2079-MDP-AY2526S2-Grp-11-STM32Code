@@ -22,14 +22,14 @@ UART_HandleTypeDef huart3;
 Safety: Clamps values between 500-2500μs to prevent servo damage
 Hardware: Uses TIM12, Channel 2 for PWM generation
 Range: Standard servo range (500μs = 0°, 1500μs = 90°, 2500μs = 180°)
-LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Servo_ToUS() instead*/
+LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Steering_ToUS() instead*/
 
 static inline void _Servo_WriteUS(uint16_t us)
 {
-  if (us < 500)
-    us = 500;
-  if (us > 2500)
-    us = 2500;
+  if (us < 950)
+    us = 950;
+  if (us > 2380)
+    us = 2380;
   __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
 }
 
@@ -40,12 +40,12 @@ volatile int32_t SERVO_CENTER_US = 1500;
  * @brief Map steering direction (deg) to servo PWM microsecond value
  *
  * User input range:
- *   -45 = Full Left  (500 µs)
+ *   -45 = Full Left  (950 µs)
  *     0 = Straight   (SERVO_CENTER_US µs)
- *   +45 = Full Right (2400 µs)
+ *   +45 = Full Right (2380 µs)
  *
  * @param steer_angle Steering angle in degrees [-45 to +45]
- * Adds a delay 100ms for servo to move
+ * No delay. Delay should be handled by the caller
  * @return uint16_t Pulse widinth in microseconds
  */
 uint16_t Steering_ToUS(int16_t steer_angle)
@@ -56,10 +56,14 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     // Linear interpolation using the dynamic center
     // but we want exact 0° = SERVO_CENTER_US, so adjust baseline
 
-    int32_t us = SERVO_CENTER_US + (int32_t)steer_angle * ( (2400 - 500) / 90 );
+    int32_t us = SERVO_CENTER_US + (int32_t)steer_angle * ( (2380 - 950) / 90 );
+
+    // Transmit steering angle and pulse width via UART
+    char msg[64];
+    sprintf(msg, "STEER:%d US:%ld\r\n", steer_angle, us);
+    HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), 10);
 
     _Servo_WriteUS((uint16_t)us);
-    HAL_Delay(100); // Let servo settle
     return (uint16_t)us;
 }
 
@@ -1163,17 +1167,29 @@ int main(void)
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
+  Servo_SetAngle_Safe(0,1);
+  HAL_Delay(1000);
+  //Steering_ToUS(-30);
+    // HAL_Delay(2000);
 
-  Drive_Straight_ToCM(100.0f, 1000); // go 100 cm straight, PWM=3000
+  //Drive_Straight_ToCM(100.0f, 1000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
-  //Turn_Car(90.0f, 2500, 40);
-  //Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
-  //HAL_Delay(1000);
-  //Drive_Straight_ToCM(100.0f, 2000);
-  //HAL_Delay(1000);
-  //Drive_Straight_ToCM(100.0f, 2500);
-  //HAL_Delay(1000);
-  //Drive_Straight_ToCM(100.0f, 3000);
+    Turn_Car(90.0f, 2500, 45);
+  HAL_Delay(2000);
+  Turn_Car(90.0f, 2500, -45);
+  HAL_Delay(2000);
+  Turn_Car(180.0f, 2500, 45);
+  HAL_Delay(2000);
+  Turn_Car(180.0f, 2500, -45);
+  HAL_Delay(2000);
+    Turn_Car(360.0f, 2500, 45);
+  HAL_Delay(2000);
+  Turn_Car(360.0f, 2500, -45);
+  HAL_Delay(2000);
+  
+
+
+
 
   //Measure_Motor_Speed(1500); // Live RPM Comparison
   //Turn_Car(180.0f, 2500, 40);     // Test rotation

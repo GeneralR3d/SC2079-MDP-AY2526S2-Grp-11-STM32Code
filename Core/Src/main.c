@@ -264,19 +264,19 @@ void Motor_direction(uint8_t forward)
   }
 }
 //simple motor forward code - no pid control
-//void Motor_forward(int pwmVal)
-//{
-//  // Motor A: PWM on CH3, CH4 = 0
-//  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
-//  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
-//
-//  // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
-//  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
-//  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
-//
-//  sprintf(buf, "PWM = %4dF ", pwmVal);
-//  OLED_ShowString(0, 20, buf);
-//}
+void Motor_forward_simple(int pwmVal)
+{
+ // Motor A: PWM on CH3, CH4 = 0
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
+
+ // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
+
+ sprintf(buf, "PWM = %4dF ", pwmVal);
+ OLED_ShowString(0, 20, buf);
+}
 
 
 //THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
@@ -850,6 +850,7 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual)
 
 void Turn_Car(float target_deg, int pwmVal, int steer_angle)
 {
+    float target_deg_abs = fabsf(target_deg);
     // Safety check on steering angle
     if (steer_angle < -45) steer_angle = -45;
     if (steer_angle > 45) steer_angle = 45;
@@ -874,7 +875,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
     uint32_t start_time = HAL_GetTick();
     const uint32_t timeout_ms = 15000; // 5 second timeout
 
-    while (fabsf(yaw_angle) < fabsf(target_deg))
+    while (fabsf(yaw_angle) < target_deg_abs)
     {
         // Safety timeout
         if (HAL_GetTick() - start_time > timeout_ms) {
@@ -887,7 +888,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
         yaw_angle -= gyro_bias * (HAL_GetTick() - last_time) / 1000.0f;
 
         // Drive with controlled speed (reduce speed as we approach target)
-        float progress = fabsf(yaw_angle) / fabsf(target_deg);
+        float progress = fabsf(yaw_angle) / target_deg_abs;
         int current_pwm = pwmVal;
 
         // Slow down when approaching target (optional)
@@ -898,7 +899,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
             current_pwm = pwmVal * 0.3f; // Reduce speed to 30%
         }
 
-        Motor_forward(current_pwm);
+        Motor_forward_simple(current_pwm);
 
         // Small delay
         HAL_Delay(10);
@@ -910,14 +911,15 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
         }
 
         // Debug output
-        sprintf(buf, "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg);
+        sprintf(buf, "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
         OLED_ShowString(0, 40, (uint8_t*)buf);
         OLED_Refresh_Gram();
     }
 
     // Stop & gradually return to center
     Motor_stop();
-    Servo_SetAngle_Safe(0, 1); // gradual return to center
+    Servo_SetAngle_Safe(0, 0); // gradual return to center
+    HAL_Delay(100);
 
     // Final position feedback
     sprintf(buf, "Final: %.1f°", yaw_angle);

@@ -55,7 +55,7 @@ uint16_t Steering_ToUS(int16_t steer_angle)
 
     // Linear interpolation using the dynamic center
     // but we want exact 0° = SERVO_CENTER_US, so adjust baseline
-    
+
     int32_t us = SERVO_CENTER_US + (int32_t)steer_angle * ( (2400 - 500) / 90 );
 
     _Servo_WriteUS((uint16_t)us);
@@ -226,7 +226,6 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
   }
 }
 
-// boot function for motor drive
 void MotorDrive_enable(void)
 {
   // Enable PWM through TIM4-CH1/CH4 to drive the DC motor - Rev D board
@@ -332,7 +331,7 @@ void Motor_forward(int pwmVal)
   if (correction < -2000) correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-  int left_offset  = -350;
+  int left_offset  = -450;
   int right_offset = 0;
 
   // --- Apply correction + offsets ---
@@ -484,8 +483,8 @@ static inline void reset_encoders(void) {
 // if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be smaller
 // if actual < measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be larger
 
-const float COUNTS_PER_CM_L = 90.0f;
-const float COUNTS_PER_CM_R = 86.0f;
+const float COUNTS_PER_CM_L = 80.0f;
+const float COUNTS_PER_CM_R = 77.0f;
 
 static float cm_travelled(void) {
   float cmL = (float)left_ticks()  / COUNTS_PER_CM_L;
@@ -508,7 +507,6 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
   return v;
 }
 
-// IR sensor 5 calibration
 static inline float dist_cm_from_mv_5(uint32_t mv)
 {
   const float A = 104.0f;         // mV
@@ -524,7 +522,6 @@ static inline float dist_cm_from_mv_5(uint32_t mv)
   return d;
 }
 
-// IR sensor 4 calibration
 static inline float dist_cm_from_mv_4(uint32_t mv)
 {
   const float A = 45.22f;         // mV
@@ -681,7 +678,7 @@ uint32_t HCSR04_Read(void)
 void Drive_Straight_ToCM(float target_cm, int base_pwm) {
   reset_encoders();
 
-  const float STOP_TOL_CM = fmaxf(2.0f, target_cm * 0.06f); // ±6%
+  const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
 
   uint32_t t0 = HAL_GetTick(), lastPrint = 0;
   while (1) {
@@ -708,9 +705,21 @@ void Drive_Straight_ToCM(float target_cm, int base_pwm) {
     Motor_forward(pwm);
 
     // Display progress
-    sprintf(buf, "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
     OLED_ShowString(0, 20, (uint8_t*)buf);
+    // // show left encoder ticks for debugging
+    // int32_t l = left_ticks();
+    // snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
+    // OLED_ShowString(0, 30, (uint8_t*)buf);
+
+    // // int32_t r = right_ticks();
+    // // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    // // OLED_ShowString(0, 30, (uint8_t*)buf);
+
     OLED_Refresh_Gram();
+
+    //4600 ticks approximately for left for 62cm, so 74 for left!?
+    //457_ for 57 cm, left, so 80.31
 
     HAL_Delay(10);
 
@@ -828,12 +837,12 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual)
 
 /**
  * @brief Turns the robot to a target relative angle using gyroscope feedback.
- * 
+ *
  * This function sets the steering to a specified angle and drives the motors
  * until the integrated yaw angle reaches the target. It includes local gyro
  * bias calibration, speed ramping as the target is approached, an obstacle
  * detection safety check, and a 15-second timeout.
- * 
+ *
  * @param target_deg The relative angle to rotate by (degrees).
  * @param pwmVal The base PWM speed for the turn.
  * @param steer_angle The steering servo angle during the turn [-45 to 45].
@@ -945,7 +954,7 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
         HAL_Delay(2700);
         Motor_stop();
         HAL_Delay(200);
-        Turn_Car(90.0f, turn_pwm, 40); // 90° right turn
+        Rotate_Angle(90.0f, turn_pwm, 40); // 90° right turn
         HAL_Delay(500);
 
 
@@ -1002,7 +1011,7 @@ void Measure_Motor_Speed(int pwmVal)
             last_tick = HAL_GetTick();
             last_left = current_left;
             last_right = current_right;
-            
+
             float cm_curr_left = (float)delta_left / COUNTS_PER_CM_L;
             float cm_curr_right = (float)delta_right / COUNTS_PER_CM_R;
 
@@ -1153,7 +1162,7 @@ int main(void)
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
 
-  //Drive_Straight_ToCM(100.0f, 3000); // go 100 cm straight, PWM=3000
+  Drive_Straight_ToCM(100.0f, 1000); // go 100 cm straight, PWM=3000
   //Test_Encoders();
   //Turn_Car(90.0f, 2500, 40);
   //Drive_Straight_ToCM(100.0f, 1500); // Test straight driving
@@ -1208,7 +1217,7 @@ int main(void)
 	//straight driving code
 	//Drive_Straight_ToCM(20.0f, 3000); // go 100 cm straight, PWM=3000
 
-	//target rotation 
+	//target rotation
 //	Turn_Car(90.0f, 2500, 25);   // rotate ~90° with servo at 25°
 //	Turn_Car(180.0f, 2500, 25);  // rotate ~180°
 

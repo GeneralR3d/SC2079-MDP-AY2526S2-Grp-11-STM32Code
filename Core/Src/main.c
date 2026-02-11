@@ -119,13 +119,20 @@ void process_command(char *cmd) {
     } else if (strncmp(cmd, "r(", 2) == 0) {
         float target_deg;
         int pwm, steer;
+        float target_cm = 0.0f;
 
-        // Expect: r(90,2500,40)
-        if (sscanf(cmd + 2, "%f,%d,%d", &target_deg, &pwm, &steer) == 3) {
-            Turn_Car(target_deg, pwm, steer);
+        // Expect: r(90,2500,40[,distance])
+        int parsed = sscanf(cmd + 2, "%f,%d,%d,%f", &target_deg, &pwm, &steer, &target_cm);
+        if (parsed >= 3) {
+            Turn_Car(target_deg, pwm, steer, (parsed == 4) ? target_cm : 0.0f);
 
             char msg[64];
-            snprintf(msg, sizeof(msg), "Rotated %.2f deg at PWM %d\r\n", target_deg, pwm);
+            if (parsed == 4) {
+                snprintf(msg, sizeof(msg), "Rotated %.2f deg / %.2f cm at PWM %d\r\n",
+                         target_deg, target_cm, pwm);
+            } else {
+                snprintf(msg, sizeof(msg), "Rotated %.2f deg at PWM %d\r\n", target_deg, pwm);
+            }
             HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
         } else {
             char err[] = "ERR: bad rotate args\r\n";
@@ -902,9 +909,10 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual)
  * @param target_deg The relative angle to rotate by (degrees).
  * @param pwmVal The base PWM speed for the turn.
  * @param steer_angle The steering servo angle during the turn [-45 to 45].
+ * @param target_cm Optional distance limit (>=0). Set to 0 to ignore.
  */
 
-void Turn_Car(float target_deg, int pwmVal, int steer_angle)
+void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 {
     float target_deg_abs = fabsf(target_deg);
     // Safety check on steering angle
@@ -913,6 +921,12 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
 
     yaw_angle = 0;          // reset yaw integration
     last_time = HAL_GetTick();
+    reset_encoders();       // reset odometry when starting the turn
+
+    float target_cm_abs = fabsf(target_cm);
+    float stop_tol_cm = fmaxf(0.0f, target_cm_abs * 0.01f); // ±1%
+    uint8_t use_distance = (target_cm_abs > 0.0f) ? 1u : 0u;
+    float cm_now = 0.0f;
 
     //     float gyro_bias = 0;
     // for(int i = 0; i < 10; i++) {
@@ -935,7 +949,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
     uint32_t start_time = HAL_GetTick();
     const uint32_t timeout_ms = 15000; // 5 second timeout
 
-    while (fabsf(yaw_angle) < target_deg_abs)
+    while (1)
     {
         // Safety timeout
         if (HAL_GetTick() - start_time > timeout_ms) {
@@ -943,6 +957,16 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
         }
 
         Update_Yaw();
+        float abs_yaw = fabsf(yaw_angle);
+        if (use_distance) {
+            cm_now = cm_travelled();
+        }
+
+        uint8_t angle_reached = (target_deg_abs > 0.0f) && (abs_yaw >= target_deg_abs);
+        uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
+        if (angle_reached || distance_reached) {
+            break;
+        }
 
         // Apply gyro bias correction
         //yaw_angle -= gyro_bias * (HAL_GetTick() - last_time) / 1000.0f;
@@ -951,22 +975,26 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
 
 
         // Drive with controlled speed (reduce speed as we approach target)
-        float progress = fabsf(yaw_angle) / target_deg_abs;
+        float angle_progress = (target_deg_abs > 0.0f) ? abs_yaw / target_deg_abs : 0.0f;
+        if (angle_progress > 1.0f) angle_progress = 1.0f;
+        float dist_progress = (use_distance && target_cm_abs > 0.0f) ? (cm_now / target_cm_abs) : 0.0f;
+        if (dist_progress > 1.0f) dist_progress = 1.0f;
+        float progress = fmaxf(angle_progress, dist_progress);
         int current_pwm = pwmVal;
 
         // Slow down when approaching target (optional)
-        if (progress > 0.6f) {
-            current_pwm = pwmVal * 0.7f; // Reduce speed to 50%
+        if (progress > 0.9f) {
+            current_pwm = (int)(pwmVal * 0.2f);
+        } else if (progress > 0.8f) {
+            current_pwm = (int)(pwmVal * 0.3f);
+        } else if (progress > 0.7f) {
+            current_pwm = (int)(pwmVal * 0.3f);
+        } else if (progress > 0.6f) {
+            current_pwm = (int)(pwmVal * 0.7f);
         }
-        else if (progress > 0.7f) {
-            current_pwm = pwmVal * 0.3f; // Reduce speed to 30%
-        }
-        else if (progress > 0.8f) {
-            current_pwm = pwmVal * 0.3f; // Reduce speed to 30%
-        }
-        else if (progress > 0.9f) {
-            current_pwm = pwmVal * 0.2f; // Reduce speed to 30%
-        }
+
+        if (current_pwm < pwmMin) current_pwm = pwmMin;
+        if (current_pwm > pwmMax) current_pwm = pwmMax;
 
 //        Motor_forward_simple(current_pwm);
 
@@ -982,7 +1010,12 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
         }
 
         // Debug output
-        sprintf(buf, "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+        if (use_distance) {
+            snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
+                     abs_yaw, target_deg_abs, cm_now, target_cm_abs);
+        } else {
+            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+        }
         OLED_ShowString(0, 40, (uint8_t*)buf);
         OLED_Refresh_Gram();
     }
@@ -993,7 +1026,12 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle)
     HAL_Delay(100);
 
     // Final position feedback
-    sprintf(buf, "Final: %.1f°", yaw_angle);
+    if (use_distance) {
+        cm_now = cm_travelled();
+        snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
+    } else {
+        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
+    }
     OLED_ShowString(0, 50, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
@@ -1039,7 +1077,7 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
         Servo_SetAngle_Safe(0, 1); // gradual return to center
         HAL_Delay(200);
 
-        Turn_Car(-180.0f, 2500, -5);
+        Turn_Car(-180.0f, 2500, -5, 0.0f);
 
         // Sequence complete feedback
         sprintf(buf, "Sequence complete!");

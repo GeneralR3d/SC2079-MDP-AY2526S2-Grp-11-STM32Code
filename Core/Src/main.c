@@ -520,7 +520,7 @@ static inline uint32_t tim_arr(TIM_TypeDef *t) {
 }
 
 // Forward ticks on LEFT wheel since reset (>=0) with wrap handling
-static inline int32_t left_ticks(void) {
+static inline int32_t left_ticks_forward(void) {
   uint32_t arrp1 = tim_arr(TIM2) + 1u;
   int32_t d = (int32_t)((uint32_t)TIM2->CNT - (uint32_t)L0);
   if (d < 0) d += (int32_t)arrp1;
@@ -528,9 +528,25 @@ static inline int32_t left_ticks(void) {
 }
 
 // Forward ticks on RIGHT wheel since reset (>=0); flip sense (R reversed)
-static inline int32_t right_ticks(void) {
+static inline int32_t right_ticks_forward(void) {
   uint32_t arrp1 = tim_arr(TIM5) + 1u;
   int32_t d = (int32_t)((int32_t)R0 - (int32_t)TIM5->CNT);
+  if (d < 0) d += (int32_t)arrp1;
+  return d;
+}
+
+// Reverse ticks on LEFT wheel since reset (>=0); counts when wheel turns backward
+static inline int32_t left_ticks_reverse(void) {
+  uint32_t arrp1 = tim_arr(TIM2) + 1u;
+  int32_t d = (int32_t)((uint32_t)L0 - (uint32_t)TIM2->CNT);
+  if (d < 0) d += (int32_t)arrp1;
+  return d;
+}
+
+// Reverse ticks on RIGHT wheel since reset (>=0); flip sense (R reversed)
+static inline int32_t right_ticks_reverse(void) {
+  uint32_t arrp1 = tim_arr(TIM5) + 1u;
+  int32_t d = (int32_t)((uint32_t)TIM5->CNT - (uint32_t)R0);
   if (d < 0) d += (int32_t)arrp1;
   return d;
 }
@@ -550,9 +566,15 @@ static inline void reset_encoders(void) {
 const float COUNTS_PER_CM_L = 80.0f;
 const float COUNTS_PER_CM_R = 77.0f;
 
-static float cm_travelled(void) {
-  float cmL = (float)left_ticks()  / COUNTS_PER_CM_L;
-  float cmR = (float)right_ticks() / COUNTS_PER_CM_R;
+static float cm_travelled_forward(void) {
+  float cmL = (float)left_ticks_forward()  / COUNTS_PER_CM_L;
+  float cmR = (float)right_ticks_forward() / COUNTS_PER_CM_R;
+  return 0.5f * (cmL + cmR);
+}
+
+static float cm_travelled_reverse(void) {
+  float cmL = (float)left_ticks_reverse()  / COUNTS_PER_CM_L;
+  float cmR = (float)right_ticks_reverse() / COUNTS_PER_CM_R;
   return 0.5f * (cmL + cmR);
 }
 
@@ -772,11 +794,11 @@ void Drive_Straight_ToCM(float target_cm, int base_pwm) {
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
     OLED_ShowString(0, 20, (uint8_t*)buf);
     // // show left encoder ticks for debugging
-    // int32_t l = left_ticks();
+    // int32_t l = left_ticks_forward();
     // snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
     // OLED_ShowString(0, 30, (uint8_t*)buf);
 
-    // // int32_t r = right_ticks();
+    // // int32_t r = right_ticks_forward();
     // // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
     // // OLED_ShowString(0, 30, (uint8_t*)buf);
 
@@ -1129,14 +1151,14 @@ void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm)
 
 
 
-void Measure_Motor_Speed(int pwmVal)
+void Measure_Motor_Speed_forward(int pwmVal)
 {
     char buf[64];
     reset_encoders();
 
     uint32_t last_tick = HAL_GetTick();
-    int32_t last_left = left_ticks();
-    int32_t last_right = right_ticks();
+    int32_t last_left = left_ticks_forward();
+    int32_t last_right = right_ticks_forward();
 
     // Display initial message
     OLED_Clear();
@@ -1149,8 +1171,8 @@ void Measure_Motor_Speed(int pwmVal)
 
     while(1) {
         if (HAL_GetTick() - last_tick >= 100) {
-            int32_t current_left = left_ticks();
-            int32_t current_right = right_ticks();
+            int32_t current_left = left_ticks_forward();
+            int32_t current_right = right_ticks_forward();
 
             int32_t delta_left = current_left - last_left;
             int32_t delta_right = current_right - last_right;

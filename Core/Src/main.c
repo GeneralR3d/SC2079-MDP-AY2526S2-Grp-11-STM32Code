@@ -107,7 +107,7 @@ void process_command(char *cmd) {
 
         // Expect: d(50,2000)
         if (sscanf(cmd + 2, "%f,%d", &target_cm, &base_pwm) == 2) {
-            Drive_Straight_ToCM(target_cm, base_pwm);
+            Drive_Forward_ToCM(target_cm, base_pwm);
 
             char msg[64];
             snprintf(msg, sizeof(msg), "Driving %.2f cm at PWM %d\r\n", target_cm, base_pwm);
@@ -761,12 +761,12 @@ uint32_t HCSR04_Read(void)
 #define STRAIGHT_KI 0.05f   // Integral gain for steering correction
 #define MIN_PWM_DIFF 50     // Minimum PWM difference to apply correction
 
-void Drive_Straight_ToCM(float target_cm, int base_pwm) {
+void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   reset_encoders();
 
   const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
 
-  uint32_t t0 = HAL_GetTick(), lastPrint = 0;
+
   while (1) {
     // Emergency stop for obstacles
     if (HCSR04_Read() <= 20){
@@ -809,6 +809,37 @@ void Drive_Straight_ToCM(float target_cm, int base_pwm) {
 
     HAL_Delay(10);
 
+  }
+  Motor_stop();
+}
+
+void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
+  reset_encoders();
+
+  const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
+
+  while (1) {
+    float cm_now = cm_travelled_reverse();
+    float cm_left = target_cm - cm_now;
+    if (cm_left <= STOP_TOL_CM) break;
+
+    // Speed ramping (same as forward)
+    int pwm = base_pwm;
+    if (cm_left > 30.0f)      pwm = base_pwm;
+    else if (cm_left > 10.0f) pwm = (int)(base_pwm * 0.60f);
+    else if (cm_left > 3.0f)  pwm = (int)(base_pwm * 0.35f);
+    else                      pwm = (int)(base_pwm * 0.25f);
+
+    if (pwm < pwmMin) pwm = pwmMin;
+
+    Motor_reverse(pwm);
+
+    // Display progress
+    snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
+    OLED_ShowString(0, 20, (uint8_t*)buf);
+    OLED_Refresh_Gram();
+
+    HAL_Delay(10);
   }
   Motor_stop();
 }
@@ -982,7 +1013,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
         Update_Yaw();
         float abs_yaw = fabsf(yaw_angle);
         if (use_distance) {
-            cm_now = cm_travelled();
+            cm_now = cm_travelled_forward();
         }
 
         uint8_t angle_reached = (target_deg_abs > 0.0f) && (abs_yaw >= target_deg_abs);
@@ -1340,8 +1371,7 @@ int main(void)
   //Steering_ToUS(-30);
     // HAL_Delay(2000);
 
-  //Drive_Straight_ToCM(100.0f, 1000); // go 100 cm straight, PWM=3000
-  //Test_Encoders();
+
 
 
   
@@ -1390,8 +1420,7 @@ int main(void)
 
 	    HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
 	}
-	//straight driving code
-	//Drive_Straight_ToCM(20.0f, 3000); // go 100 cm straight, PWM=3000
+
 
 	//target rotation
 //	Turn_Car(90.0f, 2500, 25);   // rotate ~90° with servo at 25°

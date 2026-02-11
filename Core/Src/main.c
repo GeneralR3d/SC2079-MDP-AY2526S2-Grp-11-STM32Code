@@ -194,8 +194,8 @@ int16_t rpm = 0;               // speed in rpm number of count/sec * 60 sec  div
 int start = 0;                 // use to start stop the motor
 int32_t pwmVal = 0;            // pwm value to control motor speed
 int32_t pwmVal_raw = 0;        // pwm value before clamping - for debugging
-int16_t pwmMax = (7200 - 200); // Maximum PWM value = 7200 keep the maximum value to 7000
-int16_t pwmMin = 250;          // offset value to compensate for deadzone
+const int16_t pwmMax = (7200 - 200); // Maximum PWM value = 7200 keep the maximum value to 7000
+const int16_t pwmMin = 250;          // offset value to compensate for deadzone
 int err;                       // status for checking return
 
 int encoder_A = 0; // encoders reading of Drive A (from complement of TIM2->CNT)
@@ -764,6 +764,8 @@ uint32_t HCSR04_Read(void)
 void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   reset_encoders();
 
+  if (base_pwm < pwmMin) base_pwm = pwmMin;
+  if (base_pwm > pwmMax) base_pwm = pwmMax;
   const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
 
 
@@ -816,6 +818,8 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
   reset_encoders();
 
+  if (base_pwm < pwmMin) base_pwm = pwmMin;
+  if (base_pwm > pwmMax) base_pwm = pwmMax;
   const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
 
   while (1) {

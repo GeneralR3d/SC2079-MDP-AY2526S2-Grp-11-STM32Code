@@ -74,82 +74,77 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     return (uint16_t)us;
 }
 
-/*void process_command(char *cmd) {
-    if (strncmp(cmd, "motor_forward(", 14) == 0) {
-        int d = atoi(cmd + 14);
-        Motor_forward(d);
-    } else if (strncmp(cmd, "motor_reverse(", 14) == 0) {
-        int d = atoi(cmd + 14);
-        Motor_reverse(d);
-    } else if (strncmp(cmd, "servo_us(", 9) == 0) {
-        int us = atoi(cmd + 9);
-        _Servo_WriteUS((uint16_t)us);
-    } else if (strncmp(cmd, "servo_deg(", 10) == 0) {
-        int deg = atoi(cmd + 10);
-        Steering_ToUS(deg);
-    } else if (strncmp(cmd, "stop", 4) == 0) {
-        Motor_stop();
-    }
-
-    // Send acknowledgement back to RPi
-    char msg[64];
-    snprintf(msg, sizeof(msg), "Executed: %s\r\n", cmd);
-    HAL_UART_Transmit(&huart2, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-}*/
-
 char last_cmd_display[64] = "None"; // Buffer to keep last command visible on OLED
-
 void process_command(char *cmd) {
     snprintf(last_cmd_display, sizeof(last_cmd_display), "%s", cmd);
-    if (strncmp(cmd, "d(", 2) == 0) {
-        float target_cm;
-        int base_pwm;
+    // First, try simple CSV-style motion commands:
+    //  f,<pwm>,<cm>
+    //  b,<pwm>,<cm>
+    //  l,<deg>,<pwm>,<cm>
+    //  r,<deg>,<pwm>,<cm>
+    //
+    // Examples:
+    //  "f,3000,100"     -> forward 100 cm at PWM 3000
+    //  "b,3000,100"     -> reverse 100 cm at PWM 3000
+    //  "l,90.0,3000,50" -> left  90° at PWM 3000 with 50 cm arc
+    //  "r,180.0,3000,50"-> right 180° at PWM 3000 with 50 cm arc
+    char type;
+    float p1, p2, p3;
+    int parsed_csv = sscanf(cmd, " %c,%f,%f,%f", &type, &p1, &p2, &p3);
 
-        // Expect: d(50,2000)
-        if (sscanf(cmd + 2, "%f,%d", &target_cm, &base_pwm) == 2) {
-            Drive_Forward_ToCM(target_cm, base_pwm);
-
-            char msg[64];
-            snprintf(msg, sizeof(msg), "Driving %.2f cm at PWM %d\r\n", target_cm, base_pwm);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-        } else {
-            char err[] = "ERR: bad drive args\r\n";
-            HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
-        }
-
-    } else if (strncmp(cmd, "r(", 2) == 0) {
-        float target_deg;
-        int pwm, steer;
-        float target_cm = 0.0f;
-
-        // Expect: r(90,2500,40[,distance])
-        int parsed = sscanf(cmd + 2, "%f,%d,%d,%f", &target_deg, &pwm, &steer, &target_cm);
-        if (parsed >= 3) {
-            Turn_Car(target_deg, pwm, steer, (parsed == 4) ? target_cm : 0.0f);
+    if (parsed_csv >= 3 && (type == 'f' || type == 'b' || type == 'l' || type == 'r')) {
+        if (type == 'f' && parsed_csv >= 3) {
+            float pwm_f = p1;
+            float dist_cm = p2;
+            Drive_Forward_ToCM(dist_cm, (int)pwm_f);
 
             char msg[64];
-            if (parsed == 4) {
-                snprintf(msg, sizeof(msg), "Rotated %.2f deg / %.2f cm at PWM %d\r\n",
-                         target_deg, target_cm, pwm);
-            } else {
-                snprintf(msg, sizeof(msg), "Rotated %.2f deg at PWM %d\r\n", target_deg, pwm);
-            }
+            snprintf(msg, sizeof(msg), "FWD %.1f cm @ %d\r\n", dist_cm, (int)pwm_f);
             HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-        } else {
-            char err[] = "ERR: bad rotate args\r\n";
-            HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+            return;
+        } else if (type == 'b' && parsed_csv >= 3) {
+            float pwm_b = p1;
+            float dist_cm = p2;
+            Drive_Reverse_ToCM(dist_cm, (int)pwm_b);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "REV %.1f cm @ %d\r\n", dist_cm, (int)pwm_b);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            return;
+        } else if (type == 'l' && parsed_csv >= 4) {
+            float deg = p1;
+            int pwm = (int)p2;
+            float arc_cm = p3;
+
+            cmd_turn_left(deg, pwm, arc_cm);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            return;
+        } else if (type == 'r' && parsed_csv >= 4) {
+            float deg = p1;
+            int pwm = (int)p2;
+            float arc_cm = p3;
+
+            cmd_turn_right(deg, pwm, arc_cm);
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            return;
         }
-
-    } else if (strncmp(cmd, "stop", 4) == 0) {
-        Motor_stop();
-        char msg[] = "Stopped\r\n";
-        HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
-
-    } else {
+        // If we got here, CSV header was recognised but arguments were bad
         char err[64];
-        snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
+        snprintf(err, sizeof(err), "ERR: bad CSV cmd %s\r\n", cmd);
         HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+        return;
     }
+
+    // Unknown / unsupported command
+    char err[64];
+    snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
+    HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
 }
 
 #define CMD_BUF_LEN 64
@@ -1096,6 +1091,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 
 void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
 {
+    if (target_deg > 360.0f) target_deg = 360.0f;
     float arc_length_cm = fabsf(target_cm);
     float steer_mag_deg = 45.0f;
 

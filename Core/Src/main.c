@@ -254,25 +254,7 @@ void Motor_stop(void)
   __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 }
 
-void Motor_direction(uint8_t forward)
-{
-  if (forward)
-  {                                                 // move forward
-    __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 1); // Motor A forward
-    __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
 
-    __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 1); // Motor D forward (inverted)
-    __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
-  }
-  else
-  {                                                 // reverse
-    __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0); // Motor A reverse
-    __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 1);
-
-    __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 1); // Motor D reverse (inverted)
-    __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
-  }
-}
 //simple motor forward code - no pid control
 void Motor_forward_simple(int pwmVal)
 {
@@ -369,22 +351,86 @@ void Motor_forward(int pwmVal)
   // HAL_UART_Transmit(&huart3, (uint8_t*)buf, strlen(buf), HAL_MAX_DELAY);
 }
 
-//simple motor forward code - no pid control
+
 
 
 
 void Motor_reverse(int pwmVal)
 {
-  // Motor A: PWM on CH4, CH3 = 0
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, pwmVal);
+  // --- Static variables persist across calls ---
+  static uint32_t last_time = 0;
+  static float heading = 0.0f;
+  static float target_heading = 0.0f;
+  static uint8_t initialized = 0;
 
-  // Motor D: PWM on CH3, CH4 = 0
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmVal);
+  static float integral = 0.0f;
+  static float last_error = 0.0f;
+  static float gz_filtered = 0.0f;
+
+  // --- Timing ---
+  uint32_t now = HAL_GetTick();
+  float dt = (now - last_time) / 1000.0f; // ms -> seconds
+  if (dt <= 0) dt = 0.001f;               // protect against div by 0
+  last_time = now;
+
+  if (!initialized) {
+    target_heading = heading;   // lock current heading
+    initialized = 1;
+  }
+
+  // --- Filter gyro Z-axis (yaw rate) ---
+  float alpha = 0.9f; // closer to 1 = smoother
+  gz_filtered = alpha * gz_filtered + (1.0f - alpha) * gz_dps;
+
+  // --- Update heading from filtered gyro ---
+  heading += gz_filtered * dt;   // integrate deg/s over time
+
+  // --- Compute heading error ---
+  float heading_error = target_heading - heading;
+  integral += heading_error * dt;                // I term
+  float derivative = (heading_error - last_error) / dt; // D term
+  last_error = heading_error;
+
+  // --- PID controller gains ---
+  float Kp_h = 30.0f;   // proportional gain
+  float Ki_h = 4.0f;    // integral gain
+  float Kd_h = 3.5f;    // derivative gain
+
+  // --- Control law (PID) ---
+  int correction = (int)(Kp_h * heading_error +
+                         Ki_h * integral +
+                         Kd_h * derivative);
+
+  // --- Clamp correction ---
+  if (correction > 2000) correction = 2000;
+  if (correction < -2000) correction = -2000;
+
+  // --- Motor offset compensation (baseline bias) ---
+  int left_offset  = -450;
+  int right_offset = 0;
+
+  // --- Apply correction + offsets ---
+  int left_pwm  = pwmVal + left_offset  - correction;
+  int right_pwm = pwmVal + right_offset + correction;
+
+  // Clamp to valid PWM range
+  if (left_pwm > pwmMax)  left_pwm = pwmMax;
+  if (left_pwm < pwmMin)  left_pwm = pwmMin;
+  if (right_pwm > pwmMax) right_pwm = pwmMax;
+  if (right_pwm < pwmMin) right_pwm = pwmMin;
+
+  // --- Send to motors ---
+  // Motor A (left) reverse
+  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
+  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, left_pwm);
+
+  // Motor D (right) reverse
+  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, right_pwm);
   __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 
-  sprintf(buf, "PWM = %4dR ", pwmVal);
-  OLED_ShowString(0, 20, buf);
+  // --- Debug (optional) ---
+  // sprintf(buf, "PWM = %4dR ", pwmVal);
+  // OLED_ShowString(0, 20, buf);
 }
 
 void serial_uart()

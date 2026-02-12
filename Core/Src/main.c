@@ -273,6 +273,19 @@ void Motor_forward_simple(int pwmVal)
  OLED_ShowString(0, 20, buf);
 }
 
+void Motor_reverse_simple(int pwmVal)
+{
+ // Motor A: PWM on CH3, CH4 = 0
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, pwmVal);
+
+ // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmVal);
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
+
+ sprintf(buf, "PWM = %4dF ", pwmVal);
+ OLED_ShowString(0, 20, buf);
+}
 
 //THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
 void Motor_forward(int pwmVal)

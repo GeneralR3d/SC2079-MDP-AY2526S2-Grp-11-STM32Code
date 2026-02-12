@@ -1245,6 +1245,25 @@ void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
     Turn_Car(target_deg, pwmVal, (int)(-steer_angle), arc_length_cm);
 }
 
+void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
+{
+    if (target_deg > 360.0f) target_deg = 360.0f;
+    float arc_length_cm = fabsf(target_cm);
+    float steer_mag_deg = 45.0f;
+
+    if (arc_length_cm > 0.0f && TURN_ARC_AT_MAX_STEER_CM > 0.0f) {
+        steer_mag_deg = 45.0f * (TURN_ARC_AT_MAX_STEER_CM / arc_length_cm);
+    }
+
+    if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
+    if (steer_mag_deg < 0.0f)  steer_mag_deg = 0.0f;
+
+    int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
+    if (steer_angle > 45) steer_angle = 45;
+
+    Turn_Car_Reverse(target_deg, pwmVal, (int)(-steer_angle), arc_length_cm);
+}
+
 void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
 {
     float arc_length_cm = fabsf(target_cm);
@@ -1261,6 +1280,24 @@ void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
     if (steer_angle > 45) steer_angle = 45;
 
     Turn_Car(target_deg, pwmVal, (int)steer_angle, arc_length_cm);
+}
+
+void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm)
+{
+    float arc_length_cm = fabsf(target_cm);
+    float steer_mag_deg = 45.0f;
+
+    if (arc_length_cm > 0.0f && TURN_ARC_AT_MAX_STEER_CM > 0.0f) {
+        steer_mag_deg = 45.0f * (TURN_ARC_AT_MAX_STEER_CM / arc_length_cm);
+    }
+
+    if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
+    if (steer_mag_deg < 0.0f)  steer_mag_deg = 0.0f;
+
+    int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
+    if (steer_angle > 45) steer_angle = 45;
+
+    Turn_Car_Reverse(target_deg, pwmVal, (int)steer_angle, arc_length_cm);
 }
 
 

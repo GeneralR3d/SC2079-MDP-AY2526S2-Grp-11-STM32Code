@@ -1089,6 +1089,130 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     OLED_Refresh_Gram();
 }
 
+void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float target_cm)
+{
+    float target_deg_abs = fabsf(target_deg);
+    // Safety check on steering angle
+    if (steer_angle < -45) steer_angle = -45;
+    if (steer_angle > 45) steer_angle = 45;
+
+    yaw_angle = 0;          // reset yaw integration
+    last_time = HAL_GetTick();
+    reset_encoders();       // reset odometry when starting the turn
+
+    float target_cm_abs = fabsf(target_cm);
+    float stop_tol_cm = fmaxf(0.0f, target_cm_abs * 0.01f); // ±1%
+    uint8_t use_distance = (target_cm_abs > 0.0f) ? 1u : 0u;
+    float cm_now = 0.0f;
+
+    //     float gyro_bias = 0;
+    // for(int i = 0; i < 10; i++) {
+    //     int16_t ax, ay, az, gx, gy, gz;
+    //     ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+    //     gyro_bias += gz / 131.0f; // Convert to dps
+    //     HAL_Delay(10);
+    // }
+    // gyro_bias /= 10.0f;
+    // Calibrate gyro bias handled globally in main/init
+    // If you want to recalibrate here, you should update the GLOBAL `gyro_z_bias`
+    // but typically one calibration at startup is enough.
+    // For now, we will rely on Update_Yaw using the global bias.
+
+
+    // Set steering angle gradually for safety
+    Servo_SetAngle_Safe(steer_angle, 1); // gradual movement
+    HAL_Delay(100); // let servo settle
+
+    uint32_t start_time = HAL_GetTick();
+    const uint32_t timeout_ms = 15000; // 5 second timeout
+
+    while (1)
+    {
+        // Safety timeout
+        if (HAL_GetTick() - start_time > timeout_ms) {
+            break;
+        }
+
+        Update_Yaw();
+        float abs_yaw = fabsf(yaw_angle);
+        if (use_distance) {
+            cm_now = cm_travelled_forward();
+        }
+
+        uint8_t angle_reached = (target_deg_abs > 0.0f) && (abs_yaw >= target_deg_abs);
+        uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
+        if (angle_reached || distance_reached) {
+            break;
+        }
+
+        // Apply gyro bias correction
+        //yaw_angle -= gyro_bias * (HAL_GetTick() - last_time) / 1000.0f;
+        // NOTE: Update_Yaw() already integrates (gz - gyro_z_bias).
+        // DO NOT subtract bias again here.
+
+
+        // Drive with controlled speed (reduce speed as we approach target)
+        float angle_progress = (target_deg_abs > 0.0f) ? abs_yaw / target_deg_abs : 0.0f;
+        if (angle_progress > 1.0f) angle_progress = 1.0f;
+        float dist_progress = (use_distance && target_cm_abs > 0.0f) ? (cm_now / target_cm_abs) : 0.0f;
+        if (dist_progress > 1.0f) dist_progress = 1.0f;
+        float progress = fmaxf(angle_progress, dist_progress);
+        int current_pwm = pwmVal;
+
+        // Slow down when approaching target (optional)
+        if (progress > 0.9f) {
+            current_pwm = (int)(pwmVal * 0.2f);
+        } else if (progress > 0.8f) {
+            current_pwm = (int)(pwmVal * 0.3f);
+        } else if (progress > 0.7f) {
+            current_pwm = (int)(pwmVal * 0.3f);
+        } else if (progress > 0.6f) {
+            current_pwm = (int)(pwmVal * 0.7f);
+        }
+
+        if (current_pwm < pwmMin) current_pwm = pwmMin;
+        if (current_pwm > pwmMax) current_pwm = pwmMax;
+
+//        Motor_forward_simple(current_pwm);
+
+        Motor_reverse(current_pwm);
+
+        // Small delay
+        HAL_Delay(10);
+
+        // Emergency stop condition
+        if (HCSR04_Read() <= 15) {
+            Motor_stop();
+            break;
+        }
+
+        // Debug output
+        if (use_distance) {
+            snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
+                     abs_yaw, target_deg_abs, cm_now, target_cm_abs);
+        } else {
+            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+        }
+        OLED_ShowString(0, 40, (uint8_t*)buf);
+        OLED_Refresh_Gram();
+    }
+
+    // Stop & gradually return to center
+    Motor_stop();
+    Servo_SetAngle_Safe(0, 0); // gradual return to center
+    HAL_Delay(100);
+
+    // Final position feedback
+    if (use_distance) {
+        cm_now = cm_travelled_reverse();
+        snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
+    } else {
+        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
+    }
+    OLED_ShowString(0, 50, (uint8_t*)buf);
+    OLED_Refresh_Gram();
+}
+
 void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
 {
     if (target_deg > 360.0f) target_deg = 360.0f;

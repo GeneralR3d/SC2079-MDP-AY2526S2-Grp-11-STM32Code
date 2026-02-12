@@ -1149,7 +1149,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
         Update_Yaw();
         float abs_yaw = fabsf(yaw_angle);
         if (use_distance) {
-            cm_now = cm_travelled_forward();
+            cm_now = cm_travelled_reverse();
         }
 
         uint8_t angle_reached = (target_deg_abs > 0.0f) && (abs_yaw >= target_deg_abs);
@@ -1188,7 +1188,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 
 //        Motor_forward_simple(current_pwm);
 
-        Motor_reverse(current_pwm);
+        Motor_reverse_simple(current_pwm);
 
         // Small delay
         HAL_Delay(10);

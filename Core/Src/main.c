@@ -116,7 +116,11 @@ void process_command(char *cmd) {
             int pwm = (int)p2;
             float arc_cm = p3;
 
-            cmd_turn_left(deg, pwm, arc_cm);
+			if (arc_cm >= 0) {
+				cmd_turn_left(deg, pwm, arc_cm);
+			else if (arc_cm < 0) {
+				arc_cm = arc_cm * (-1);
+				cmd_turn_left_reverse(deg, pwm, arc_cm)
 
             char msg[64];
             snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
@@ -127,7 +131,11 @@ void process_command(char *cmd) {
             int pwm = (int)p2;
             float arc_cm = p3;
 
-            cmd_turn_right(deg, pwm, arc_cm);
+            if (arc_cm >= 0) {
+				cmd_turn_right(deg, pwm, arc_cm);
+			else if (arc_cm < 0) {
+				arc_cm = arc_cm * (-1);
+				cmd_turn_right_reverse(deg, pwm, arc_cm)
 
             char msg[64];
             snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);

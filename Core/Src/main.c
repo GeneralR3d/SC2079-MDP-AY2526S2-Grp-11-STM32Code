@@ -118,9 +118,10 @@ void process_command(char *cmd) {
 
 			if (arc_cm >= 0) {
 				cmd_turn_left(deg, pwm, arc_cm);
-			else if (arc_cm < 0) {
-				arc_cm = arc_cm * (-1);
-				cmd_turn_left_reverse(deg, pwm, arc_cm)
+			} else {
+				arc_cm = -arc_cm;
+				cmd_turn_left_reverse(deg, pwm, arc_cm);
+			}
 
             char msg[64];
             snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
@@ -133,9 +134,10 @@ void process_command(char *cmd) {
 
             if (arc_cm >= 0) {
 				cmd_turn_right(deg, pwm, arc_cm);
-			else if (arc_cm < 0) {
-				arc_cm = arc_cm * (-1);
-				cmd_turn_right_reverse(deg, pwm, arc_cm)
+			} else {
+				arc_cm = -arc_cm;
+				cmd_turn_right_reverse(deg, pwm, arc_cm);
+			}
 
             char msg[64];
             snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
@@ -793,7 +795,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
       break;
     }
 
-    float cm_now  = cm_travelled();
+    float cm_now  = cm_travelled_forward();
     float cm_left = target_cm - cm_now;
     if (cm_left <= STOP_TOL_CM) break;
 
@@ -1101,7 +1103,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 
     // Final position feedback
     if (use_distance) {
-        cm_now = cm_travelled();
+        cm_now = cm_travelled_forward();
         snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
     } else {
         snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
@@ -1560,11 +1562,11 @@ int main(void)
 
 
 
-
+  Drive_Forward_ToCM(200,1500);
   //Measure_Motor_Speed(1500); // Live RPM Comparison
-  //Turn_Car(180.0f, 2500, 40);     // Test rotation
+  Turn_Car(180.0f, 2500, 40,0);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
-  //Turn_Car(-180.0f, 2500, -5);
+  Turn_Car(-180.0f, 2500, -40,0);
 
   //heree
 	//target rotation

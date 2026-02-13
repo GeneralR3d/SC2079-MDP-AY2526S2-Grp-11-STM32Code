@@ -74,9 +74,13 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     return (uint16_t)us;
 }
 
-char last_cmd_display[64] = "None"; // Buffer to keep last command visible on OLED
+void send_msg_over(const char* inputStr) {
+	char msg[64];
+	snprintf(msg, sizeof(msg), inputStr);
+	HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
+}
+
 void process_command(char *cmd) {
-    snprintf(last_cmd_display, sizeof(last_cmd_display), "%s", cmd);
     // First, try simple CSV-style motion commands:
     //  f,<pwm>,<cm>
     //  b,<pwm>,<cm>
@@ -92,17 +96,27 @@ void process_command(char *cmd) {
     float p1, p2, p3;
     int parsed_csv = sscanf(cmd, " %c,%f,%f,%f", &type, &p1, &p2, &p3);
 
+    send_msg_over("new command \r\n");
+
     if (parsed_csv >= 3 && (type == 'f' || type == 'b' || type == 'l' || type == 'r')) {
         if (type == 'f' && parsed_csv >= 3) {
+            send_msg_over("forward command executed \r\n");
+
             float pwm_f = p1;
             float dist_cm = p2;
-            Drive_Forward_ToCM(dist_cm, (int)pwm_f);
+
+            Motor_forward_simple((int)pwm_f);
+            HAL_Delay(3000);
+            Motor_stop();
+            //Drive_Forward_ToCM(dist_cm, (int)pwm_f);
 
             char msg[64];
             snprintf(msg, sizeof(msg), "FWD %.1f cm @ %d\r\n", dist_cm, (int)pwm_f);
             HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
             return;
         } else if (type == 'b' && parsed_csv >= 3) {
+            send_msg_over("backward command executed \r\n");
+
             float pwm_b = p1;
             float dist_cm = p2;
             Drive_Reverse_ToCM(dist_cm, (int)pwm_b);
@@ -112,6 +126,8 @@ void process_command(char *cmd) {
             HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
             return;
         } else if (type == 'l' && parsed_csv >= 4) {
+            send_msg_over("left rotate command executed \r\n");
+
             float deg = p1;
             int pwm = (int)p2;
             float arc_cm = p3;
@@ -1563,10 +1579,12 @@ int main(void)
 
 
   Drive_Forward_ToCM(200,1500);
+  HAL_Delay(3000);
+  Drive_Forward_ToCM(100,1500)
   //Measure_Motor_Speed(1500); // Live RPM Comparison
-  Turn_Car(180.0f, 2500, 40,0);     // Test rotation
+  //Turn_Car(180.0f, 2500, 40,0);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
-  Turn_Car(-180.0f, 2500, -40,0);
+ // Turn_Car(-180.0f, 2500, -40,0);
 
   //heree
 	//target rotation
@@ -1576,9 +1594,11 @@ int main(void)
   while (1){
 	// Below section is for the RPI command unloading and execution
 	uint8_t ch;
-	if (HAL_UART_Receive(&huart3, &ch, 1, 10) == HAL_OK) {
+	if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
 		  if (ch == '\n' || ch == '\r') {
-			  if (cmd_index > 0) {cmd_buf[cmd_index] = '\0';
+			  if (cmd_index > 0) {
+				  cmd_buf[cmd_index] = '\0';
+
 			  	  process_command(cmd_buf);
 			  	  cmd_index = 0;
 			  }

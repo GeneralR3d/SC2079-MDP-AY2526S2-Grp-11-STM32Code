@@ -24,6 +24,8 @@ Hardware: Uses TIM12, Channel 2 for PWM generation
 Range: Standard servo range (500μs = 0°, 1500μs = 90°, 2500μs = 180°)
 LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Steering_ToUS() instead*/
 
+void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
+
 static inline void _Servo_WriteUS(uint16_t us)
 {
   if (us < 950)
@@ -104,11 +106,7 @@ void process_command(char *cmd) {
 
             float pwm_f = p1;
             float dist_cm = p2;
-
-            Motor_forward_simple((int)pwm_f);
-            HAL_Delay(3000);
-            Motor_stop();
-            //Drive_Forward_ToCM(dist_cm, (int)pwm_f);
+            Drive_Forward_ToCM(dist_cm, (int)pwm_f);
 
             char msg[64];
             snprintf(msg, sizeof(msg), "FWD %.1f cm @ %d\r\n", dist_cm, (int)pwm_f);
@@ -802,9 +800,8 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   if (base_pwm > pwmMax) base_pwm = pwmMax;
   const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
 
-
   while (1) {
-    // Emergency stop for obstacles
+//     Emergency stop for obstacles
     if (HCSR04_Read() <= 20){
       Motor_stop();
       OLED_ShowString(0, 40, "Obstacle detected!");
@@ -824,7 +821,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    Motor_forward(pwm);
+    Motor_forward_simple(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1578,9 +1575,9 @@ int main(void)
 
 
 
-  Drive_Forward_ToCM(200,1500);
-  HAL_Delay(3000);
-  Drive_Forward_ToCM(100,1500)
+//  Drive_Forward_ToCM(200,1500);
+//  HAL_Delay(3000);
+//  Drive_Forward_ToCM(100,1500);
   //Measure_Motor_Speed(1500); // Live RPM Comparison
   //Turn_Car(180.0f, 2500, 40,0);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);

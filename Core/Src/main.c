@@ -17,14 +17,15 @@ TIM_HandleTypeDef htim12;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
+void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
+void Drive_Reverse_ToCM(float target_cm, int base_pwm);
+
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
 Safety: Clamps values between 500-2500μs to prevent servo damage
 Hardware: Uses TIM12, Channel 2 for PWM generation
 Range: Standard servo range (500μs = 0°, 1500μs = 90°, 2500μs = 180°)
 LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Steering_ToUS() instead*/
-
-void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 
 static inline void _Servo_WriteUS(uint16_t us)
 {
@@ -821,7 +822,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    Motor_forward_simple(pwm);
+    Motor_forward(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);

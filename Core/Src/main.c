@@ -23,6 +23,9 @@ void cmd_turn_left(float target_deg, int pwmVal, float target_cm);
 void cmd_turn_right(float target_deg, int pwmVal, float target_cm);
 void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm);
 void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm);
+void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
+void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float target_cm);
+uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 

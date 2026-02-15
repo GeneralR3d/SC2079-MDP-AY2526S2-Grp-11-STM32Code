@@ -17,6 +17,9 @@ TIM_HandleTypeDef htim12;
 UART_HandleTypeDef huart2;
 UART_HandleTypeDef huart3;
 
+void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
+void Drive_Reverse_ToCM(float target_cm, int base_pwm);
+
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
 Safety: Clamps values between 500-2500μs to prevent servo damage
@@ -104,11 +107,7 @@ void process_command(char *cmd) {
 
             float pwm_f = p1;
             float dist_cm = p2;
-
-            Motor_forward_simple((int)pwm_f);
-            HAL_Delay(3000);
-            Motor_stop();
-            //Drive_Forward_ToCM(dist_cm, (int)pwm_f);
+            Drive_Forward_ToCM(dist_cm, (int)pwm_f);
 
             char msg[64];
             snprintf(msg, sizeof(msg), "FWD %.1f cm @ %d\r\n", dist_cm, (int)pwm_f);
@@ -802,9 +801,8 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   if (base_pwm > pwmMax) base_pwm = pwmMax;
   const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
 
-
   while (1) {
-    // Emergency stop for obstacles
+//     Emergency stop for obstacles
     if (HCSR04_Read() <= 20){
       Motor_stop();
       OLED_ShowString(0, 40, "Obstacle detected!");
@@ -1578,9 +1576,9 @@ int main(void)
 
 
 
-  Drive_Forward_ToCM(200,1500);
-  HAL_Delay(3000);
-  Drive_Forward_ToCM(100,1500)
+//  Drive_Forward_ToCM(200,1500);
+//  HAL_Delay(3000);
+//  Drive_Forward_ToCM(100,1500);
   //Measure_Motor_Speed(1500); // Live RPM Comparison
   //Turn_Car(180.0f, 2500, 40,0);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);

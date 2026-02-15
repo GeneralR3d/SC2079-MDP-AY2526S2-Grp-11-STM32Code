@@ -19,6 +19,10 @@ UART_HandleTypeDef huart3;
 
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
+void cmd_turn_left(float target_deg, int pwmVal, float target_cm);
+void cmd_turn_right(float target_deg, int pwmVal, float target_cm);
+void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm);
+void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm);
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 

@@ -104,9 +104,11 @@ void process_command(char *cmd) {
     //  "r,180.0,3000,50"-> right 180° at PWM 3000 with 50 cm arc
     char type;
     float p1, p2, p3;
-    int parsed_csv = sscanf(cmd, " %c,%f,%f,%f", &type, &p1, &p2, &p3);
+    int parsed_csv = sscanf(cmd, "%c,%f,%f,%f", &type, &p1, &p2, &p3);
 
     send_msg_over("new command \r\n");
+    send_msg_over(cmd);
+    
 
     if (parsed_csv >= 3 && (type == 'f' || type == 'b' || type == 'l' || type == 'r')) {
         if (type == 'f' && parsed_csv >= 3) {
@@ -829,7 +831,8 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    Motor_forward(pwm);
+    //Motor_forward(pwm);
+    Motor_forward_simple(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -875,7 +878,8 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    Motor_reverse(pwm);
+    //Motor_reverse(pwm);
+    Motor_reverse_simple(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
@@ -1600,6 +1604,7 @@ int main(void)
 	// Below section is for the RPI command unloading and execution
 	uint8_t ch;
 	if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+    
 		  if (ch == '\n' || ch == '\r') {
 			  if (cmd_index > 0) {
 				  cmd_buf[cmd_index] = '\0';

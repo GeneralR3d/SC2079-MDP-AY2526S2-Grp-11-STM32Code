@@ -104,9 +104,10 @@ void process_command(char *cmd) {
     //  "r,180.0,3000,50"-> right 180° at PWM 3000 with 50 cm arc
     char type;
     float p1, p2, p3;
-    int parsed_csv = sscanf(cmd, " %c,%f,%f,%f", &type, &p1, &p2, &p3);
+    int parsed_csv = sscanf(cmd, "%c,%f,%f,%f", &type, &p1, &p2, &p3);
 
     send_msg_over("new command \r\n");
+    send_msg_over(cmd);
 
     if (parsed_csv >= 3 && (type == 'f' || type == 'b' || type == 'l' || type == 'r')) {
         if (type == 'f' && parsed_csv >= 3) {
@@ -138,6 +139,11 @@ void process_command(char *cmd) {
             int pwm = (int)p2;
             float arc_cm = p3;
 
+            char msg[64];
+            snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            HAL_Delay(20000);
+
 			if (arc_cm >= 0) {
 				cmd_turn_left(deg, pwm, arc_cm);
 			} else {
@@ -145,14 +151,19 @@ void process_command(char *cmd) {
 				cmd_turn_left_reverse(deg, pwm, arc_cm);
 			}
 
-            char msg[64];
-            snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+//            char msg[64];
+//            snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+//            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
             return;
         } else if (type == 'r' && parsed_csv >= 4) {
             float deg = p1;
             int pwm = (int)p2;
             float arc_cm = p3;
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            HAL_Delay(20000);
 
             if (arc_cm >= 0) {
 				cmd_turn_right(deg, pwm, arc_cm);
@@ -161,9 +172,9 @@ void process_command(char *cmd) {
 				cmd_turn_right_reverse(deg, pwm, arc_cm);
 			}
 
-            char msg[64];
-            snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+//            char msg[64];
+//            snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+//            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
             return;
         }
         // If we got here, CSV header was recognised but arguments were bad
@@ -1600,6 +1611,7 @@ int main(void)
 	// Below section is for the RPI command unloading and execution
 	uint8_t ch;
 	if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+
 		  if (ch == '\n' || ch == '\r') {
 			  if (cmd_index > 0) {
 				  cmd_buf[cmd_index] = '\0';

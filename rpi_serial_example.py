@@ -34,7 +34,9 @@ def send_command(ser, command):
     print(f"[Pi] Sending: {command}")
     # STM32 expects command terminated by \n or \r
     full_cmd = command + '\n'
-    ser.write(full_cmd.encode('utf-8'))
+    for char in full_cmd:
+        ser.write(char.encode('ascii'))
+        time.sleep(0.05)
 
 def main():
     try:
@@ -53,23 +55,10 @@ def main():
         
         # 1. Drive forward 50cm at PWM 2000
         # Command format: drive(target_cm, base_pwm)
-        # Note: Ensure arguments match what sscanf expects: "%f,%d"
-        send_command(ser, "drive(50,2000)")
-        
-        # Wait for operation to complete (adjust timing as needed)
-        time.sleep(5)
-        
-        # 2. Stop
-        send_command(ser, "stop")
-        
-        # Wait a bit
-        time.sleep(2)
+        # Note: Ensure arguments match what sscanf expects: "%f,%d
         
         # 3. Drive again
-        send_command(ser, "drive(20,1500)")
-        
-        time.sleep(3)
-        send_command(ser, "stop")
+        send_command(ser, "f,1500,100")
 
     except serial.SerialException as e:
         print(f"Could not open serial port {SERIAL_PORT}: {e}")

@@ -33,10 +33,12 @@ def send_command(ser, command):
     """
     print(f"[Pi] Sending: {command}")
     # STM32 expects command terminated by \n or \r
+    full = ''
     full_cmd = command + '\n'
     for char in full_cmd:
+        print(char)
         ser.write(char.encode('ascii'))
-        time.sleep(0.05)
+        time.sleep(1)
 
 def main():
     try:
@@ -58,7 +60,7 @@ def main():
         # Note: Ensure arguments match what sscanf expects: "%f,%d
         
         # 3. Drive again
-        send_command(ser, "f,1500,100")
+        send_command(ser, "r,90,1500,100")
 
     except serial.SerialException as e:
         print(f"Could not open serial port {SERIAL_PORT}: {e}")

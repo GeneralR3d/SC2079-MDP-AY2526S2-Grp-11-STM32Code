@@ -84,11 +84,12 @@ uint16_t Steering_ToUS(int16_t steer_angle)
     return (uint16_t)us;
 }
 
-void send_msg_over(const char* inputStr) {
-	char msg[64];
-	snprintf(msg, sizeof(msg), inputStr);
+void send_message_over(const char *input) {
+  char msg[64];
+	snprintf(msg, sizeof(msg), input);
 	HAL_UART_Transmit(&huart3, (uint8_t*) msg, strlen(msg), HAL_MAX_DELAY);
 }
+
 
 void process_command(char *cmd) {
     // First, try simple CSV-style motion commands:
@@ -104,37 +105,29 @@ void process_command(char *cmd) {
     //  "r,180.0,3000,50"-> right 180° at PWM 3000 with 50 cm arc
     char type;
     float p1, p2, p3;
-    int parsed_csv = sscanf(cmd, "%c,%f,%f,%f", &type, &p1, &p2, &p3);
+    int parsed_csv = sscanf(cmd, "%c,%f,%f,%f", &type, &p1, &p2, &p3);    
 
-    send_msg_over("new command \r\n");
-    send_msg_over(cmd);
-    
+    send_message_over(cmd);
 
     if (parsed_csv >= 3 && (type == 'f' || type == 'b' || type == 'l' || type == 'r')) {
         if (type == 'f' && parsed_csv >= 3) {
-            send_msg_over("forward command executed \r\n");
 
             float pwm_f = p1;
             float dist_cm = p2;
             Drive_Forward_ToCM(dist_cm, (int)pwm_f);
 
-            char msg[64];
-            snprintf(msg, sizeof(msg), "FWD %.1f cm @ %d\r\n", dist_cm, (int)pwm_f);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            send_message_over("ACK\n");
             return;
         } else if (type == 'b' && parsed_csv >= 3) {
-            send_msg_over("backward command executed \r\n");
 
             float pwm_b = p1;
             float dist_cm = p2;
             Drive_Reverse_ToCM(dist_cm, (int)pwm_b);
 
-            char msg[64];
-            snprintf(msg, sizeof(msg), "REV %.1f cm @ %d\r\n", dist_cm, (int)pwm_b);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            send_message_over("ACK\n");
             return;
         } else if (type == 'l' && parsed_csv >= 4) {
-            send_msg_over("left rotate command executed \r\n");
+
 
             float deg = p1;
             int pwm = (int)p2;
@@ -147,11 +140,11 @@ void process_command(char *cmd) {
 				cmd_turn_left_reverse(deg, pwm, arc_cm);
 			}
 
-            char msg[64];
-            snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            send_message_over("ACK\n");
             return;
         } else if (type == 'r' && parsed_csv >= 4) {
+
+
             float deg = p1;
             int pwm = (int)p2;
             float arc_cm = p3;
@@ -163,11 +156,10 @@ void process_command(char *cmd) {
 				cmd_turn_right_reverse(deg, pwm, arc_cm);
 			}
 
-            char msg[64];
-            snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
-            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+
+            send_message_over("ACK\n");
             return;
-        }
+    }
         // If we got here, CSV header was recognised but arguments were bad
         char err[64];
         snprintf(err, sizeof(err), "ERR: bad CSV cmd %s\r\n", cmd);

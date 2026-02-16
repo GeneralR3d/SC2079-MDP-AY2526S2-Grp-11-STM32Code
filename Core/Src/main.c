@@ -164,6 +164,7 @@ void process_command(char *cmd) {
         char err[64];
         snprintf(err, sizeof(err), "ERR: bad CSV cmd %s\r\n", cmd);
         HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+		send_message_over("ACK\n");
         return;
     }
 
@@ -171,6 +172,7 @@ void process_command(char *cmd) {
     char err[64];
     snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
     HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
+	send_message_over("ACK\n");
 }
 
 #define CMD_BUF_LEN 64

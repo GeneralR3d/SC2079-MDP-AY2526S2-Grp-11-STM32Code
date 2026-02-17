@@ -809,6 +809,9 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     if (HCSR04_Read() <= 20){
       Motor_stop();
       OLED_ShowString(0, 40, "Obstacle detected!");
+      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
+      HAL_Delay(1000);
+      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
       break;
     }
 
@@ -1100,7 +1103,10 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 
         // Emergency stop condition
         if (HCSR04_Read() <= 15) {
+          HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
             Motor_stop();
+            HAL_Delay(1000);
+            HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
             break;
         }
 
@@ -1224,7 +1230,10 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 
         // Emergency stop condition
         if (HCSR04_Read() <= 15) {
+          HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
             Motor_stop();
+            HAL_Delay(1000);
+            HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
             break;
         }
 
@@ -1614,38 +1623,35 @@ int main(void)
 	      }
 	}
 
-	uint32_t distance = HCSR04_Read();
+	// uint32_t distance = HCSR04_Read();
 
-	sprintf(buf, "Dist: %lu cm", distance);
-	OLED_ShowString(0, 50, (uint8_t*)buf);
-	if (distance <= 15) {
-	    Motor_stop();
+	// sprintf(buf, "Dist: %lu cm", distance);
+	// OLED_ShowString(0, 50, (uint8_t*)buf);
+	// if (distance <= 15) {
+	//     Motor_stop();
 
-	    // Optional: buzzer/LED feedback
-	    HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-	} else {
-	    // Example: keep moving forward at pwm=3000
-	    //Motor_forward(3000);    //to make the robot move forward when the object is removed from infront of US
+	//     // Optional: buzzer/LED feedback
+	//     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
+	// } else {
+	//     // Example: keep moving forward at pwm=3000
+	//     //Motor_forward(3000);    //to make the robot move forward when the object is removed from infront of US
 
-	    HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-	}
-
-
-	//target rotation
-//	Turn_Car(90.0f, 2500, 25);   // rotate ~90° with servo at 25°
-//	Turn_Car(180.0f, 2500, 25);  // rotate ~180°
+	//     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
+	// }
 
 
-    int16_t ax, ay, az, gx, gy, gz;
-    ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
 
-    // Scale
-    ax_g = ax / 16384.0f;
-    ay_g = ay / 16384.0f;
-    az_g = az / 16384.0f;
-    gx_dps = gx / 131.0f;
-    gy_dps = gy / 131.0f;
-    gz_dps = gz / 131.0f;
+
+    // int16_t ax, ay, az, gx, gy, gz;
+    // ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+
+    // // Scale
+    // ax_g = ax / 16384.0f;
+    // ay_g = ay / 16384.0f;
+    // az_g = az / 16384.0f;
+    // gx_dps = gx / 131.0f;
+    // gy_dps = gy / 131.0f;
+    // gz_dps = gz / 131.0f;
 
 //    sprintf(buf, "AX:%.2f AY:%.2f", ax_g, ay_g);
 //    OLED_ShowString(0, 10, (uint8_t *)buf);
@@ -1672,7 +1678,7 @@ int main(void)
     //OLED_Refresh_Gram();
 
     // Clear screen at start of loop (optional, prevents overlap)
-    OLED_Clear();
+    //OLED_Clear();
 
     // Accelerometer all in one line
     // sprintf(buf, "AX=%.2f AY=%.2f AZ=%.2f", ax_g, ay_g, az_g);
@@ -1693,17 +1699,12 @@ int main(void)
 
 
     // Refresh OLED
-    OLED_Refresh_Gram();
+    //OLED_Refresh_Gram();
 
 
-//    sprintf(buf, "RPM: %d", rpm);
-//    OLED_ShowString(0, 20, (uint8_t*)buf);
-//    OLED_Refresh_Gram();
-    // HAL_UART_Transmit(&huart3, (uint8_t *)buf, strlen(buf), HAL_MAX_DELAY);
+
+    // HAL_GPIO_TogglePin(GPIOA, LED_Pin);
     // HAL_Delay(500);
-
-    HAL_GPIO_TogglePin(GPIOA, LED_Pin);
-    HAL_Delay(500);
 
     /*
         raw4 = adc_read_channel(&hadc1, ADC_CHANNEL_4);

@@ -1083,12 +1083,8 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
         // Slow down when approaching target (optional)
         if (progress > 0.9f) {
             current_pwm = (int)(pwmVal * 0.2f);
-        } else if (progress > 0.8f) {
-            current_pwm = (int)(pwmVal * 0.3f);
         } else if (progress > 0.7f) {
-            current_pwm = (int)(pwmVal * 0.3f);
-        } else if (progress > 0.6f) {
-            current_pwm = (int)(pwmVal * 0.7f);
+            current_pwm = (int)(pwmVal * 0.5f);
         }
 
         if (current_pwm < pwmMin) current_pwm = pwmMin;
@@ -1209,13 +1205,9 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 
         // Slow down when approaching target (optional)
         if (progress > 0.9f) {
-            current_pwm = (int)(pwmVal * 0.2f);
-        } else if (progress > 0.8f) {
             current_pwm = (int)(pwmVal * 0.3f);
         } else if (progress > 0.7f) {
-            current_pwm = (int)(pwmVal * 0.3f);
-        } else if (progress > 0.6f) {
-            current_pwm = (int)(pwmVal * 0.7f);
+            current_pwm = (int)(pwmVal * 0.5f);
         }
 
         if (current_pwm < pwmMin) current_pwm = pwmMin;

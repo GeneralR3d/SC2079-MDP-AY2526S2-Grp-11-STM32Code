@@ -45,7 +45,7 @@ static inline void _Servo_WriteUS(uint16_t us)
 
 // Global servo center position (can be tweaked)
 volatile int32_t SERVO_CENTER_US = 1500;
-float TURN_ARC_AT_MAX_STEER_CM = 25.0f; // arc length when steering is 45°
+float TURN_ARC_AT_MAX_STEER_CM = 40.0f; // arc length when steering is 45°
 
 /**
  * @brief Map steering direction (deg) to servo PWM microsecond value
@@ -1571,6 +1571,7 @@ int main(void)
   HAL_Delay(1000);
   //Steering_ToUS(-30);
     // HAL_Delay(2000);
+
 
 
 

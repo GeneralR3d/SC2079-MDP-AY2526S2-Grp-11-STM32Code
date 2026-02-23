@@ -79,7 +79,7 @@ int start = 0;                 // use to start stop the motor
 int32_t pwmVal = 0;            // pwm value to control motor speed
 int32_t pwmVal_raw = 0;        // pwm value before clamping - for debugging
 const int16_t pwmMax = (7200 - 200); // Maximum PWM value = 7200 keep the maximum value to 7000
-const int16_t pwmMin = 250;          // offset value to compensate for deadzone
+const int16_t pwmMin = 500;          // offset value to compensate for deadzone
 int err;                       // status for checking return
 
 int encoder_A = 0; // encoders reading of Drive A (from complement of TIM2->CNT)
@@ -834,13 +834,14 @@ void ICM20948_ReadRaw(int16_t *ax, int16_t *ay, int16_t *az,
 // Add this after IMU initialization
 float calibrate_gyro_bias() {
     float bias_sum = 0;
-    for(int i = 0; i < 100; i++) {
+    const int samples = 200; // Increased samples for better stability
+    for(int i = 0; i < samples; i++) {
         int16_t ax, ay, az, gx, gy, gz;
         ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
         bias_sum += gz / 131.0f;
-        HAL_Delay(10);
+        HAL_Delay(5); // Smaller delay, more samples
     }
-    return bias_sum / 100.0f;
+    return bias_sum / (float)samples;
 }
 
 // Global variable
@@ -1027,25 +1028,30 @@ void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm)
 
 void Update_Yaw(void)
 {
-    // static float gz_filtered = 0.0f; // Moved to global 'gyro_gz_filtered'
-    const float alpha = 0.8f;
+    static float gz_prev = 0.0f;
+    const float alpha = 0.4f; // Reduced lag - 0.4 is faster response than 0.8
+    const float GZ_DEADZONE = 0.5f;
 
     uint32_t now = HAL_GetTick();
     float dt = (now - last_time) / 1000.0f;
     if (dt <= 0) dt = 0.001f;
     last_time = now;
 
-    // Read gyro and apply bias correction BEFORE integration
     int16_t ax, ay, az, gx, gy, gz;
     ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
 
     float gz_dps_corrected = (gz / 131.0f) - gyro_z_bias;
 
-    // Low-pass filter
+    if (fabsf(gz_dps_corrected) < GZ_DEADZONE) {
+        gz_dps_corrected = 0.0f;
+    }
+
+    // Use a lighter filter for display/damping, but integrate the raw corrected signal
     gyro_gz_filtered = alpha * gyro_gz_filtered + (1.0f - alpha) * gz_dps_corrected;
 
-    // Integrate CORRECTED gyro reading
-    yaw_angle += gyro_gz_filtered * dt;
+    // Trapezoidal integration for better precision
+    yaw_angle += (gz_prev + gz_dps_corrected) * 0.5f * dt;
+    gz_prev = gz_dps_corrected;
 }
 
 /**
@@ -1130,16 +1136,15 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     HAL_Delay(100); // let servo settle
 
     // Capture time JUST before loop starts to exclude servo movement time
-    last_time = HAL_GetTick(); 
+    last_time = HAL_GetTick();
     uint32_t start_time = HAL_GetTick();
-    const uint32_t timeout_ms = 15000; // 5 second timeout
+    uint32_t last_slow_tick = 0;
+    const uint32_t timeout_ms = 15000;
 
     while (1)
     {
-        // Safety timeout
-        if (HAL_GetTick() - start_time > timeout_ms) {
-            break;
-        }
+        uint32_t loop_tick = HAL_GetTick();
+        if (loop_tick - start_time > timeout_ms) break;
 
         Update_Yaw();
         float abs_yaw = fabsf(yaw_angle);
@@ -1168,45 +1173,45 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
         float progress = fmaxf(angle_progress, dist_progress);
         int current_pwm = pwmVal;
 
-        // Slow down when approaching target (optional)
-        if (progress > 0.9f) {
-            current_pwm = (int)(pwmVal * 0.2f);
+        if (progress > 0.95f) {
+            current_pwm = pwmMin; // Final crawl
+        } else if (progress > 0.85f) {
+            current_pwm = (int)(pwmVal * 0.3f);
         } else if (progress > 0.7f) {
-            current_pwm = (int)(pwmVal * 0.5f);
+            current_pwm = (int)(pwmVal * 0.6f);
         }
-
 
         if (current_pwm < pwmMin) current_pwm = pwmMin;
         if (current_pwm > pwmMax) current_pwm = pwmMax;
 
-//        Motor_forward_simple(current_pwm);
-
         Motor_forward_simple(current_pwm);
 
-        // Small delay
-        HAL_Delay(10);
-
-        // Emergency stop condition
-        if (HCSR04_Read() <= 15) {
+        // Run non-critical slow tasks (US sensor, OLED) only every 50ms
+        if (loop_tick - last_slow_tick > 50) {
+            last_slow_tick = loop_tick;
+            if (HCSR04_Read() <= 15) {
           HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-            Motor_stop();
+                Motor_stop();
             HAL_Delay(1000);
             HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-            break;
-        }
+                break;
+            }
 
         // Debug output
-        if (use_distance) {
+            if (use_distance) {
             snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
                      abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-        } else {
+            } else {
             snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+            }
+            OLED_ShowString(0, 40, (uint8_t*)buf);
+            OLED_Refresh_Gram();
         }
-        OLED_ShowString(0, 40, (uint8_t*)buf);
-        OLED_Refresh_Gram();
-    }
 
-    // Stop & gradually return to center
+        HAL_Delay(5); // Faster loop frequency (200Hz)
+    }
+    Motor_reverse_simple(1000);
+    HAL_Delay(50);
     Motor_stop();
     Servo_SetAngle_Safe(0, 0); // gradual return to center
     HAL_Delay(100);
@@ -1218,7 +1223,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     } else {
         snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
     }
-    OLED_ShowString(0, 50, (uint8_t*)buf);
+    OLED_ShowString(0, 40, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
 
@@ -1230,7 +1235,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     if (steer_angle > 45) steer_angle = 45;
 
     yaw_angle = 0;          // reset yaw integration
-    gyro_gz_filtered = 0;   // reset filter memory
+    gyro_gz_filtered = 0;   // reset filter memory to prevent drift inheritance
     reset_encoders();       // reset odometry when starting the turn
 
     float target_cm_abs = fabsf(target_cm);
@@ -1255,19 +1260,17 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     // Set steering angle gradually for safety
     Servo_SetAngle_Safe(steer_angle, 1); // gradual movement
     HAL_Delay(100); // let servo settle
-    
-    // Capture time JUST before loop starts to exclude servo movement time
-    last_time = HAL_GetTick(); 
 
+    // Capture time JUST before loop starts to exclude servo movement time
+    last_time = HAL_GetTick();
     uint32_t start_time = HAL_GetTick();
-    const uint32_t timeout_ms = 15000; // 5 second timeout
+    uint32_t last_slow_tick = 0;
+    const uint32_t timeout_ms = 15000;
 
     while (1)
     {
-        // Safety timeout
-        if (HAL_GetTick() - start_time > timeout_ms) {
-            break;
-        }
+        uint32_t loop_tick = HAL_GetTick();
+        if (loop_tick - start_time > timeout_ms) break;
 
         Update_Yaw();
         float abs_yaw = fabsf(yaw_angle);
@@ -1275,7 +1278,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
             cm_now = cm_travelled_reverse();
         }
 
-        const float OVERSHOOT_OFFSET = 2.0f;
+        const float OVERSHOOT_OFFSET = 2.0f; 
         uint8_t angle_reached = (target_deg_abs > OVERSHOOT_OFFSET) && (abs_yaw >= (target_deg_abs - OVERSHOOT_OFFSET));
         uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
         if (angle_reached || distance_reached) {
@@ -1296,44 +1299,45 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
         float progress = fmaxf(angle_progress, dist_progress);
         int current_pwm = pwmVal;
 
-        // Slow down when approaching target (optional)
-        if (progress > 0.9f) {
-            current_pwm = (int)(pwmVal * 0.2f);
+        if (progress > 0.95f) {
+            current_pwm = pwmMin; // Final crawl
+        } else if (progress > 0.85f) {
+            current_pwm = (int)(pwmVal * 0.3f);
         } else if (progress > 0.7f) {
-            current_pwm = (int)(pwmVal * 0.5f);
+            current_pwm = (int)(pwmVal * 0.6f);
         }
 
         if (current_pwm < pwmMin) current_pwm = pwmMin;
         if (current_pwm > pwmMax) current_pwm = pwmMax;
 
-//        Motor_forward_simple(current_pwm);
-
         Motor_reverse_simple(current_pwm);
 
-        // Small delay
-        HAL_Delay(10);
-
-        // Emergency stop condition
-        if (HCSR04_Read() <= 15) {
+        // Run non-critical slow tasks (US sensor, OLED) only every 50ms
+        if (loop_tick - last_slow_tick > 50) {
+            last_slow_tick = loop_tick;
+            if (HCSR04_Read() <= 15) {
           HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-            Motor_stop();
+                Motor_stop();
             HAL_Delay(1000);
             HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-            break;
-        }
+                break;
+            }
 
         // Debug output
-        if (use_distance) {
+            if (use_distance) {
             snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
                      abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-        } else {
+            } else {
             snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+            }
+            OLED_ShowString(0, 40, (uint8_t*)buf);
+            OLED_Refresh_Gram();
         }
-        OLED_ShowString(0, 40, (uint8_t*)buf);
-        OLED_Refresh_Gram();
-    }
 
-    // Stop & gradually return to center
+        HAL_Delay(5); // Faster loop frequency (200Hz)
+    }
+    Motor_forward_simple(1000);
+    HAL_Delay(50);
     Motor_stop();
     Servo_SetAngle_Safe(0, 0); // gradual return to center
     HAL_Delay(100);
@@ -1345,7 +1349,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     } else {
         snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
     }
-    OLED_ShowString(0, 50, (uint8_t*)buf);
+    OLED_ShowString(0, 40, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
 
@@ -1684,17 +1688,8 @@ int main(void)
   // HAL_Delay(5000);
 
 
-HAL_Delay(5000);
-  Turn_Car(90.0f, 3000, -45,0);
-  HAL_Delay(5000);
-  Turn_Car(90.0f, 3000, -45,0);
-  HAL_Delay(5000);
-  Turn_Car(90.0f, 3000, -45,0);
-  HAL_Delay(5000);
-  Turn_Car(90.0f, 3000, -45,0);
-  HAL_Delay(5000);
-  Turn_Car(90.0f, 3000, -45,0);
-  HAL_Delay(5000);
+
+
 
 
 

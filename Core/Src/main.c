@@ -32,6 +32,70 @@ const float COUNTS_PER_CM_R = 70.6355f;
 // const float COUNTS_PER_CM_L = 77.0f;
 // const float COUNTS_PER_CM_R = 80.0f;
 
+float yaw_angle = 0;   // global or static variable
+uint32_t last_time = 0;
+float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
+
+#define CMD_BUF_LEN 64
+char cmd_buf[CMD_BUF_LEN];
+int cmd_index = 0;
+
+// IR global variables
+volatile uint16_t raw4, raw5;
+volatile uint32_t mv4, mv5;
+volatile float dist4, dist5;
+volatile float ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps;
+// --- ICM20948 address / WHO_AM_I ---
+#define WHO_AM_I 0x00
+#define WHO_AM_I_VAL 0xEA
+#define REG_BANK_SEL 0x7F
+
+#define ICM_ADDR_68 (0x68 << 1)         // AD0 = 0
+#define ICM_ADDR_69 (0x69 << 1)         // AD0 = 1
+static uint16_t ICM_ADDR = ICM_ADDR_69; // will be auto-detected
+char buf[64];
+
+void SystemClock_Config(void);
+static void MX_GPIO_Init(void);
+static void MX_TIM8_Init(void);
+static void MX_TIM2_Init(void);
+static void MX_USART2_UART_Init(void);
+static void MX_TIM1_Init(void);
+static void MX_USART3_UART_Init(void);
+static void MX_I2C2_Init(void);
+static void MX_TIM5_Init(void);
+static void MX_TIM4_Init(void);
+static void MX_TIM3_Init(void);
+static void MX_TIM11_Init(void);
+static void MX_TIM12_Init(void);
+static void MX_ADC1_Init(void);
+
+uint32_t counter = 0;          // Timer 2 counter
+int16_t count = 0;             // Convert counter to signed value
+int16_t no_of_tick = 50;       // number of tick used in SysTick to calculate speed, in msec
+int16_t speed = 0;             // speed in term of number of edges detected per Systick
+int16_t rpm = 0;               // speed in rpm number of count/sec * 60 sec  divide by 260 count per round
+int start = 0;                 // use to start stop the motor
+int32_t pwmVal = 0;            // pwm value to control motor speed
+int32_t pwmVal_raw = 0;        // pwm value before clamping - for debugging
+const int16_t pwmMax = (7200 - 200); // Maximum PWM value = 7200 keep the maximum value to 7000
+const int16_t pwmMin = 250;          // offset value to compensate for deadzone
+int err;                       // status for checking return
+
+int encoder_A = 0; // encoders reading of Drive A (from complement of TIM2->CNT)
+int encoder_D = 0; // encoders reading of Drive D (from TIM5->CNT)
+
+int16_t position = 0;                        // position of the motor (1 rotation = 260 count)
+extern int16_t oldpos;                       // // see SysTick_Handler in stm32f4xx_it.c
+int16_t angle = 0;                           // angle of rotation, in degree resolution = 360 degree/260 tick
+int16_t target_angle = 0;                    // target angle of rotation,
+int16_t position_target;                     // target position
+int16_t direction;                           // motor direction 0 or 1
+int16_t error;                               // error between target and actual
+int32_t error_area = 0;                      // area under error - to calculate I for PI implementation
+int32_t error_old, error_change, error_rate; // to calculate D for PID control
+int32_t millisOld, millisNow, dt;            // to calculate I and D for PID control
+
 
 
 static inline int32_t left_ticks_forward(void);
@@ -196,66 +260,6 @@ void process_command(char *cmd) {
     HAL_UART_Transmit(&huart3, (uint8_t*)err, strlen(err), HAL_MAX_DELAY);
 	send_message_over("ACK\n");
 }
-
-#define CMD_BUF_LEN 64
-char cmd_buf[CMD_BUF_LEN];
-int cmd_index = 0;
-
-// IR global variables
-volatile uint16_t raw4, raw5;
-volatile uint32_t mv4, mv5;
-volatile float dist4, dist5;
-volatile float ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps;
-// --- ICM20948 address / WHO_AM_I ---
-#define WHO_AM_I 0x00
-#define WHO_AM_I_VAL 0xEA
-#define REG_BANK_SEL 0x7F
-
-#define ICM_ADDR_68 (0x68 << 1)         // AD0 = 0
-#define ICM_ADDR_69 (0x69 << 1)         // AD0 = 1
-static uint16_t ICM_ADDR = ICM_ADDR_69; // will be auto-detected
-char buf[64];
-
-void SystemClock_Config(void);
-static void MX_GPIO_Init(void);
-static void MX_TIM8_Init(void);
-static void MX_TIM2_Init(void);
-static void MX_USART2_UART_Init(void);
-static void MX_TIM1_Init(void);
-static void MX_USART3_UART_Init(void);
-static void MX_I2C2_Init(void);
-static void MX_TIM5_Init(void);
-static void MX_TIM4_Init(void);
-static void MX_TIM3_Init(void);
-static void MX_TIM11_Init(void);
-static void MX_TIM12_Init(void);
-static void MX_ADC1_Init(void);
-
-uint32_t counter = 0;          // Timer 2 counter
-int16_t count = 0;             // Convert counter to signed value
-int16_t no_of_tick = 50;       // number of tick used in SysTick to calculate speed, in msec
-int16_t speed = 0;             // speed in term of number of edges detected per Systick
-int16_t rpm = 0;               // speed in rpm number of count/sec * 60 sec  divide by 260 count per round
-int start = 0;                 // use to start stop the motor
-int32_t pwmVal = 0;            // pwm value to control motor speed
-int32_t pwmVal_raw = 0;        // pwm value before clamping - for debugging
-const int16_t pwmMax = (7200 - 200); // Maximum PWM value = 7200 keep the maximum value to 7000
-const int16_t pwmMin = 250;          // offset value to compensate for deadzone
-int err;                       // status for checking return
-
-int encoder_A = 0; // encoders reading of Drive A (from complement of TIM2->CNT)
-int encoder_D = 0; // encoders reading of Drive D (from TIM5->CNT)
-
-int16_t position = 0;                        // position of the motor (1 rotation = 260 count)
-extern int16_t oldpos;                       // // see SysTick_Handler in stm32f4xx_it.c
-int16_t angle = 0;                           // angle of rotation, in degree resolution = 360 degree/260 tick
-int16_t target_angle = 0;                    // target angle of rotation,
-int16_t position_target;                     // target position
-int16_t direction;                           // motor direction 0 or 1
-int16_t error;                               // error between target and actual
-int32_t error_area = 0;                      // area under error - to calculate I for PI implementation
-int32_t error_old, error_change, error_rate; // to calculate D for PID control
-int32_t millisOld, millisNow, dt;            // to calculate I and D for PID control
 
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim)
@@ -1019,12 +1023,11 @@ void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm)
 }
 
 
-float yaw_angle = 0;   // global or static variable
-uint32_t last_time = 0;
+
 
 void Update_Yaw(void)
 {
-    static float gz_filtered = 0.0f;
+    // static float gz_filtered = 0.0f; // Moved to global 'gyro_gz_filtered'
     const float alpha = 0.8f;
 
     uint32_t now = HAL_GetTick();
@@ -1039,10 +1042,10 @@ void Update_Yaw(void)
     float gz_dps_corrected = (gz / 131.0f) - gyro_z_bias;
 
     // Low-pass filter
-    gz_filtered = alpha * gz_filtered + (1.0f - alpha) * gz_dps_corrected;
+    gyro_gz_filtered = alpha * gyro_gz_filtered + (1.0f - alpha) * gz_dps_corrected;
 
     // Integrate CORRECTED gyro reading
-    yaw_angle += gz_filtered * dt;
+    yaw_angle += gyro_gz_filtered * dt;
 }
 
 /**
@@ -1100,7 +1103,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     if (steer_angle > 45) steer_angle = 45;
 
     yaw_angle = 0;          // reset yaw integration
-    last_time = HAL_GetTick();
+    gyro_gz_filtered = 0;   // reset filter memory to prevent drift inheritance
     reset_encoders();       // reset odometry when starting the turn
 
     float target_cm_abs = fabsf(target_cm);
@@ -1126,6 +1129,8 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     Servo_SetAngle_Safe(steer_angle, 1); // gradual movement
     HAL_Delay(100); // let servo settle
 
+    // Capture time JUST before loop starts to exclude servo movement time
+    last_time = HAL_GetTick(); 
     uint32_t start_time = HAL_GetTick();
     const uint32_t timeout_ms = 15000; // 5 second timeout
 
@@ -1142,7 +1147,8 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
             cm_now = cm_travelled_forward();
         }
 
-        uint8_t angle_reached = (target_deg_abs > 0.0f) && (abs_yaw >= target_deg_abs);
+        const float OVERSHOOT_OFFSET = 2.0f; 
+        uint8_t angle_reached = (target_deg_abs > OVERSHOOT_OFFSET) && (abs_yaw >= (target_deg_abs - OVERSHOOT_OFFSET));
         uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
         if (angle_reached || distance_reached) {
             break;
@@ -1168,6 +1174,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
         } else if (progress > 0.7f) {
             current_pwm = (int)(pwmVal * 0.5f);
         }
+
 
         if (current_pwm < pwmMin) current_pwm = pwmMin;
         if (current_pwm > pwmMax) current_pwm = pwmMax;
@@ -1223,7 +1230,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     if (steer_angle > 45) steer_angle = 45;
 
     yaw_angle = 0;          // reset yaw integration
-    last_time = HAL_GetTick();
+    gyro_gz_filtered = 0;   // reset filter memory
     reset_encoders();       // reset odometry when starting the turn
 
     float target_cm_abs = fabsf(target_cm);
@@ -1248,6 +1255,9 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     // Set steering angle gradually for safety
     Servo_SetAngle_Safe(steer_angle, 1); // gradual movement
     HAL_Delay(100); // let servo settle
+    
+    // Capture time JUST before loop starts to exclude servo movement time
+    last_time = HAL_GetTick(); 
 
     uint32_t start_time = HAL_GetTick();
     const uint32_t timeout_ms = 15000; // 5 second timeout
@@ -1265,7 +1275,8 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
             cm_now = cm_travelled_reverse();
         }
 
-        uint8_t angle_reached = (target_deg_abs > 0.0f) && (abs_yaw >= target_deg_abs);
+        const float OVERSHOOT_OFFSET = 2.0f;
+        uint8_t angle_reached = (target_deg_abs > OVERSHOOT_OFFSET) && (abs_yaw >= (target_deg_abs - OVERSHOOT_OFFSET));
         uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
         if (angle_reached || distance_reached) {
             break;
@@ -1354,7 +1365,7 @@ void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
     int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
     if (steer_angle > 45) steer_angle = 45;
 
-    Turn_Car(target_deg, pwmVal, (int)(-steer_angle), arc_length_cm);
+    Turn_Car(target_deg, pwmVal, (int)(-steer_angle), 0);
 }
 
 void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
@@ -1373,7 +1384,7 @@ void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
     int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
     if (steer_angle > 45) steer_angle = 45;
 
-    Turn_Car_Reverse(target_deg, pwmVal, (int)(-steer_angle), arc_length_cm);
+    Turn_Car_Reverse(target_deg, pwmVal, (int)(-steer_angle), 0);
 }
 
 void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
@@ -1391,7 +1402,7 @@ void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
     int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
     if (steer_angle > 45) steer_angle = 45;
 
-    Turn_Car(target_deg, pwmVal, (int)steer_angle, arc_length_cm);
+    Turn_Car(target_deg, pwmVal, (int)steer_angle, 0);
 }
 
 void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm)
@@ -1409,7 +1420,7 @@ void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm)
     int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
     if (steer_angle > 45) steer_angle = 45;
 
-    Turn_Car_Reverse(target_deg, pwmVal, (int)steer_angle, arc_length_cm);
+    Turn_Car_Reverse(target_deg, pwmVal, (int)steer_angle, 0);
 }
 
 
@@ -1669,11 +1680,20 @@ int main(void)
   // Drive_Forward_ToCM(200,3000);
   // HAL_Delay(20000);
   // Drive_Forward_ToCM(100,3000);
-  Drive_Reverse_ToCM(100,3000);
+  // Drive_Reverse_ToCM(100,3000);
+  // HAL_Delay(5000);
+
+
+HAL_Delay(5000);
+  Turn_Car(90.0f, 3000, -45,0);
   HAL_Delay(5000);
   Turn_Car(90.0f, 3000, -45,0);
   HAL_Delay(5000);
-  Turn_Car_Reverse(90.0f, 3000, -45,0);
+  Turn_Car(90.0f, 3000, -45,0);
+  HAL_Delay(5000);
+  Turn_Car(90.0f, 3000, -45,0);
+  HAL_Delay(5000);
+  Turn_Car(90.0f, 3000, -45,0);
   HAL_Delay(5000);
 
 

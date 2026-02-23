@@ -20,20 +20,24 @@ UART_HandleTypeDef huart3;
 //------------------------------------------
 //Global variables
 //------------------------------------------
-static int PWM_TRIM_FORWARD = 0;       // negative slows the left side to fix veer-right
-static int PWM_TRIM_REVERSE = 350;       // positive slows the right side to fix veer-left
+static int PWM_TRIM_FORWARD = -500;       // negative slows the left side to fix veer-right
+static int PWM_TRIM_REVERSE = -500;       // positive slows the right side to fix veer-left
 
 // average distance using the calibrated scales
 // if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be smaller
 // if actual < measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be larger
 
-const float COUNTS_PER_CM_L = 80.0f;
-const float COUNTS_PER_CM_R = 77.0f;
+const float COUNTS_PER_CM_L = 74.0467f;
+const float COUNTS_PER_CM_R = 70.6355f;
+// const float COUNTS_PER_CM_L = 77.0f;
+// const float COUNTS_PER_CM_R = 80.0f;
 
 
 
 static inline int32_t left_ticks_forward(void);
 static inline int32_t right_ticks_forward(void);
+static inline int32_t left_ticks_reverse(void);
+static inline int32_t right_ticks_reverse(void);
 
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
@@ -319,11 +323,10 @@ void Motor_forward_simple(int pwmVal)
  OLED_ShowString(0, 20, buf);
 }
 
-//simple motor forward code - no pid control
 void Motor_forward_advanced(int pwmVal)
 {
   //Gain
-  const float Kp_balance = 80.0f;
+  const float Kp_balance = 50.0f;
 
   // --- encoder balancing (dir-safe) ---
   int32_t dL = left_ticks_forward();
@@ -350,6 +353,38 @@ void Motor_forward_advanced(int pwmVal)
  sprintf(buf, "PWM L = %4dR = %4d ", left_cmd, right_cmd);
  OLED_ShowString(0, 20, buf);
 }
+
+void Motor_reverse_advanced(int pwmVal)
+{
+  //Gain
+  const float Kp_balance = 50.0f;
+
+  // --- encoder balancing (dir-safe) ---
+  int32_t dL = left_ticks_reverse();
+  int32_t dR = right_ticks_reverse();
+  float normL = (float)dL / COUNTS_PER_CM_L;
+  float normR = (float)dR / COUNTS_PER_CM_R;
+
+  float e = normL - normR;
+  int corr = (int)(Kp_balance * e);
+  if (corr > 1200)  corr = 1200;
+  if (corr < -1200) corr = -1200;
+
+  int left_cmd  = pwmVal + PWM_TRIM_REVERSE  - corr;
+  int right_cmd = pwmVal - PWM_TRIM_REVERSE  + corr;
+
+ // Motor A: PWM on CH3, CH4 = 0
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, left_cmd);
+
+ // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, right_cmd);
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
+
+ sprintf(buf, "PWM L = %4dR = %4d ", left_cmd, right_cmd);
+ OLED_ShowString(0, 20, buf);
+}
+
 
 void Motor_reverse_simple(int pwmVal)
 {
@@ -847,7 +882,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
   if (base_pwm < pwmMin) base_pwm = pwmMin;
   if (base_pwm > pwmMax) base_pwm = pwmMax;
-  const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
+  const float STOP_TOL_CM = 0.0f;
 
   while (1) {
 //     Emergency stop for obstacles
@@ -873,21 +908,21 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    //Motor_forward(pwm);
+    //Motor_forward(pwm);                        //feb 23
     //Motor_forward_simple(pwm);
-    Motor_forward_advanced(pwm);
+    Motor_forward_advanced(pwm);             //feb 23
 
     // Display progress
-    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 20, (uint8_t*)buf);
+    //snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    //OLED_ShowString(0, 20, (uint8_t*)buf);
     // // show left encoder ticks for debugging
-    // int32_t l = left_ticks_forward();
-    // snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
-    // OLED_ShowString(0, 30, (uint8_t*)buf);
+    //int32_t l = left_ticks_forward();
+    //snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
+    //OLED_ShowString(0, 20, (uint8_t*)buf);
 
-    // // int32_t r = right_ticks_forward();
-    // // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    // // OLED_ShowString(0, 30, (uint8_t*)buf);
+    //int32_t r = right_ticks_forward();
+    //snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    //OLED_ShowString(0, 30, (uint8_t*)buf);
 
     OLED_Refresh_Gram();
 
@@ -905,7 +940,7 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
 
   if (base_pwm < pwmMin) base_pwm = pwmMin;
   if (base_pwm > pwmMax) base_pwm = pwmMax;
-  const float STOP_TOL_CM = fmaxf(0.0f, target_cm * 0.01f); // ±1%
+  const float STOP_TOL_CM = 0.0f;
 
   while (1) {
     float cm_now = cm_travelled_reverse();
@@ -922,7 +957,8 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin) pwm = pwmMin;
 
     //Motor_reverse(pwm);
-    Motor_reverse_simple(pwm);
+    //Motor_reverse_simple(pwm);
+    Motor_reverse_advanced(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
@@ -1068,7 +1104,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     reset_encoders();       // reset odometry when starting the turn
 
     float target_cm_abs = fabsf(target_cm);
-    float stop_tol_cm = fmaxf(0.0f, target_cm_abs * 0.01f); // ±1%
+    float stop_tol_cm = 0.0f;
     uint8_t use_distance = (target_cm_abs > 0.0f) ? 1u : 0u;
     float cm_now = 0.0f;
 
@@ -1191,7 +1227,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     reset_encoders();       // reset odometry when starting the turn
 
     float target_cm_abs = fabsf(target_cm);
-    float stop_tol_cm = fmaxf(0.0f, target_cm_abs * 0.01f); // ±1%
+    float stop_tol_cm = 0.0f;
     uint8_t use_distance = (target_cm_abs > 0.0f) ? 1u : 0u;
     float cm_now = 0.0f;
 
@@ -1251,7 +1287,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 
         // Slow down when approaching target (optional)
         if (progress > 0.9f) {
-            current_pwm = (int)(pwmVal * 0.3f);
+            current_pwm = (int)(pwmVal * 0.2f);
         } else if (progress > 0.7f) {
             current_pwm = (int)(pwmVal * 0.5f);
         }
@@ -1448,7 +1484,7 @@ void Measure_Motor_Speed_forward(int pwmVal)
     OLED_Refresh_Gram();
 
     // Start motors
-    Motor_forward(pwmVal);
+    Motor_forward_advanced(pwmVal);
 
     while(1) {
         if (HAL_GetTick() - last_tick >= 100) {
@@ -1572,8 +1608,8 @@ int main(void)
     sprintf(buf, "ICM OK");
     // Calibrate AFTER initialization
     gyro_z_bias = calibrate_gyro_bias();
-    sprintf(buf, "Bias: %.2f", gyro_z_bias);
-    OLED_ShowString(0, 20, (uint8_t *)buf);
+    //sprintf(buf, "Bias: %.2f", gyro_z_bias);
+    //OLED_ShowString(0, 20, (uint8_t *)buf);
   }
   else
   {
@@ -1624,19 +1660,33 @@ int main(void)
 
 
 
+  //Motor_forward(1500);
+
 
   
 
 
+  // Drive_Forward_ToCM(200,3000);
+  // HAL_Delay(20000);
+  // Drive_Forward_ToCM(100,3000);
+  Drive_Reverse_ToCM(100,3000);
+  HAL_Delay(5000);
+  Turn_Car(90.0f, 3000, -45,0);
+  HAL_Delay(5000);
+  Turn_Car_Reverse(90.0f, 3000, -45,0);
+  HAL_Delay(5000);
 
-Drive_Forward_ToCM(200,1500);
-HAL_Delay(5000);
-Drive_Forward_ToCM(100,2000);
-HAL_Delay(5000);
-Drive_Forward_ToCM(100,2500);
-HAL_Delay(5000);
-Drive_Forward_ToCM(100,3000);
-  //Measure_Motor_Speed(1500); // Live RPM Comparison
+
+
+
+
+  
+
+
+  //Drive_Forward_ToCM(200,1500);
+  //HAL_Delay(5000);
+
+  //Measure_Motor_Speed_forward(3000); // Live RPM Comparison
   //Turn_Car(180.0f, 2500, 40,0);     // Test rotation
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
  // Turn_Car(-180.0f, 2500, -40,0);

@@ -27,10 +27,10 @@ static int PWM_TRIM_REVERSE = -500;       // positive slows the right side to fi
 // if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be smaller
 // if actual < measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be larger
 
-const float COUNTS_PER_CM_L = 74.0467f;
-const float COUNTS_PER_CM_R = 70.6355f;
-// const float COUNTS_PER_CM_L = 77.0f;
-// const float COUNTS_PER_CM_R = 80.0f;
+// const float COUNTS_PER_CM_L = 74.0467f;
+// const float COUNTS_PER_CM_R = 70.6355f;
+const float COUNTS_PER_CM_L = 77.0f;
+const float COUNTS_PER_CM_R = 80.0f;
 
 float yaw_angle = 0;   // global or static variable
 uint32_t last_time = 0;
@@ -70,6 +70,8 @@ static void MX_TIM3_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_TIM12_Init(void);
 static void MX_ADC1_Init(void);
+
+#define OBSTACLE_THRESHOLD_CM 3
 
 uint32_t counter = 0;          // Timer 2 counter
 int16_t count = 0;             // Convert counter to signed value
@@ -892,7 +894,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
   while (1) {
 //     Emergency stop for obstacles
-    if (HCSR04_Read() <= 20){
+    if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM){
       Motor_stop();
       OLED_ShowString(0, 30, "Obstacle detected!");
       HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
@@ -914,13 +916,13 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    Motor_forward(pwm);                        //feb 23
-    //Motor_forward_simple(pwm);
+    //Motor_forward(pwm);                        //feb 23
+    Motor_forward_simple(pwm);
     //Motor_forward_advanced(pwm);             //feb 23
 
     // Display progress
-    //snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    //OLED_ShowString(0, 20, (uint8_t*)buf);
+    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    OLED_ShowString(0, 10, (uint8_t*)buf);
     // // show left encoder ticks for debugging
     //int32_t l = left_ticks_forward();
     //snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
@@ -935,9 +937,9 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     //4600 ticks approximately for left for 62cm, so 74 for left!?
     //457_ for 57 cm, left, so 80.31
 
-    HAL_Delay(10);
-
   }
+  Motor_reverse_simple(1000);
+  HAL_Delay(50);
   Motor_stop();
 }
 
@@ -963,16 +965,17 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin) pwm = pwmMin;
 
     //Motor_reverse(pwm);
-    //Motor_reverse_simple(pwm);
-    Motor_reverse_advanced(pwm);
+    Motor_reverse_simple(pwm);
+    //Motor_reverse_advanced(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
     OLED_ShowString(0, 10, (uint8_t*)buf);
     OLED_Refresh_Gram();
 
-    HAL_Delay(10);
   }
+  Motor_forward_simple(1000);
+  HAL_Delay(50);
   Motor_stop();
 }
 
@@ -1190,7 +1193,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
         // Run non-critical slow tasks (US sensor, OLED) only every 50ms
         if (loop_tick - last_slow_tick > 50) {
             last_slow_tick = loop_tick;
-            if (HCSR04_Read() <= 15) {
+            if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
           HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
                 Motor_stop();
             HAL_Delay(1000);
@@ -1320,7 +1323,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
         // Run non-critical slow tasks (US sensor, OLED) only every 50ms
         if (loop_tick - last_slow_tick > 50) {
             last_slow_tick = loop_tick;
-            if (HCSR04_Read() <= 15) {
+            if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
           HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
                 Motor_stop();
             HAL_Delay(1000);
@@ -1363,79 +1366,37 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     OLED_Refresh_Gram();
 }
 
+
 void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
 {
-    if (target_deg > 360.0f) target_deg = 360.0f;
-    float arc_length_cm = fabsf(target_cm);
-    float steer_mag_deg = 45.0f;
+    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
-        // steer = (PI / 4) * TURN_RADIUS * target_deg / arc_length_cm
-        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
-    }
-
-    if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
-    if (steer_mag_deg < 0.0f)  steer_mag_deg = 0.0f;
-
-    int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
-    if (steer_angle > 45) steer_angle = 45;
-
-    Turn_Car(target_deg, pwmVal, (int)(-steer_angle), target_cm);
+    Turn_Car(target_deg, pwmVal, -45, target_cm);
 }
 
 void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
 {
-    if (target_deg > 360.0f) target_deg = 360.0f;
-    float arc_length_cm = fabsf(target_cm);
-    float steer_mag_deg = 45.0f;
+    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
-        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
-    }
-
-    if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
-    if (steer_mag_deg < 0.0f)  steer_mag_deg = 0.0f;
-
-    int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
-    if (steer_angle > 45) steer_angle = 45;
-
-    Turn_Car_Reverse(target_deg, pwmVal, (int)(-steer_angle), target_cm);
+    Turn_Car_Reverse(target_deg, pwmVal, -45, target_cm);
 }
 
 void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
 {
-    float arc_length_cm = fabsf(target_cm);
-    float steer_mag_deg = 45.0f;
+    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
-        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
-    }
-
-    if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
-    if (steer_mag_deg < 0.0f)  steer_mag_deg = 0.0f;
-
-    int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
-    if (steer_angle > 45) steer_angle = 45;
-
-    Turn_Car(target_deg, pwmVal, (int)steer_angle, 0);
+    Turn_Car(target_deg, pwmVal, 45, 0);
 }
 
 void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm)
 {
-    float arc_length_cm = fabsf(target_cm);
-    float steer_mag_deg = 45.0f;
+    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
-        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
-    }
-
-    if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
-    if (steer_mag_deg < 0.0f)  steer_mag_deg = 0.0f;
-
-    int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
-    if (steer_angle > 45) steer_angle = 45;
-
-    Turn_Car_Reverse(target_deg, pwmVal, (int)steer_angle, 0);
+    Turn_Car_Reverse(target_deg, pwmVal, 45, 0);
 }
 
 
@@ -1694,9 +1655,10 @@ int main(void)
 
 
   // Drive_Forward_ToCM(200,3000);
-  // HAL_Delay(20000);
-  // Drive_Forward_ToCM(100,3000);
-  // Drive_Reverse_ToCM(100,3000);
+
+  Drive_Forward_ToCM(100,3000);
+  HAL_Delay(10000);
+  Drive_Reverse_ToCM(100,3000);
   // HAL_Delay(5000);
 
 

@@ -1198,12 +1198,14 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
             }
 
         // Debug output
-            if (use_distance) {
+//            if (use_distance) {
+//            snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
+//                     abs_yaw, target_deg_abs, cm_now, target_cm_abs);
+//            } else {
+//            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+//            }
             snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
                      abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-            } else {
-            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
-            }
             OLED_ShowString(0, 40, (uint8_t*)buf);
             OLED_Refresh_Gram();
         }
@@ -1217,12 +1219,14 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     HAL_Delay(100);
 
     // Final position feedback
-    if (use_distance) {
-        cm_now = cm_travelled_forward();
-        snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
-    } else {
-        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
-    }
+//    if (use_distance) {
+//        cm_now = cm_travelled_forward();
+//        snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
+//    } else {
+//        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
+//    }
+    cm_now = cm_travelled_forward();
+    snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
     OLED_ShowString(0, 40, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
@@ -1324,12 +1328,15 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
             }
 
         // Debug output
-            if (use_distance) {
+//            if (use_distance) {
+//            snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
+//                     abs_yaw, target_deg_abs, cm_now, target_cm_abs);
+//            } else {
+//            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
+//            }
+
             snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
                      abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-            } else {
-            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°", yaw_angle, target_deg_abs);
-            }
             OLED_ShowString(0, 40, (uint8_t*)buf);
             OLED_Refresh_Gram();
         }
@@ -1342,13 +1349,15 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     Servo_SetAngle_Safe(0, 0); // gradual return to center
     HAL_Delay(100);
 
-    // Final position feedback
-    if (use_distance) {
-        cm_now = cm_travelled_reverse();
-        snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
-    } else {
-        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
-    }
+//    // Final position feedback
+//    if (use_distance) {
+//        cm_now = cm_travelled_reverse();
+//        snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
+//    } else {
+//        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
+//    }
+    cm_now = cm_travelled_reverse();
+    snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
     OLED_ShowString(0, 40, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
@@ -1593,10 +1602,10 @@ int main(void)
   // rpm = (int)((1000/no_of_tick) * 60/260 * 1/dt);  // For calculating motor rpm - by multiplying it with speed value
   // rpm = (1000.0f / (float)no_of_tick) * (60.0f / 260.0f);
   OLED_Init();
-  OLED_ShowString(10, 5, "SC2104/CE3002"); // show message on OLED display at line 5)
-  OLED_ShowString(40, 30, "Lab 4");        // show message on OLED display at line 30)
-  oled_buf = "Motor Control";              // anther way to show message through buffer
-  OLED_ShowString(10, 50, oled_buf);       // another message at line 50
+//  OLED_ShowString(10, 5, "SC2104/CE3002"); // show message on OLED display at line 5)
+//  OLED_ShowString(40, 30, "Lab 4");        // show message on OLED display at line 30)
+//  oled_buf = "Motor Control";              // anther way to show message through buffer
+//  OLED_ShowString(10, 50, oled_buf);       // another message at line 50
 
   uint8_t sbuf[] = "SC2104\n\r";                                 // send to serial port
   HAL_UART_Transmit(&huart3, sbuf, sizeof(sbuf), HAL_MAX_DELAY); // Send through Serial Port @115200
@@ -1654,8 +1663,8 @@ int main(void)
 //  sprintf(buf, "%4d", target_angle); // Hall Sensor = 26 poles/13 pulses, DC motor = 20x13 = 260 pulse per revolution
 //  OLED_ShowString(60, 0, buf);
 
-  OLED_ShowString(15, 40, "Press User");    // show message on OLED display at line 40)
-  OLED_ShowString(0, 50, "button to stop"); // show message on OLED display at line 50)
+//  OLED_ShowString(15, 40, "Press User");    // show message on OLED display at line 40)
+//  OLED_ShowString(0, 50, "button to stop"); // show message on OLED display at line 50)
   OLED_Refresh_Gram();
 
 //  if (target_angle > 0) // Determine rotation direction)

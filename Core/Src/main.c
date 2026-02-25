@@ -37,6 +37,7 @@ uint32_t last_time = 0;
 float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
 
 #define CMD_BUF_LEN 64
+#define PI 3.141592653589f
 char cmd_buf[CMD_BUF_LEN];
 int cmd_index = 0;
 
@@ -131,7 +132,7 @@ static inline void _Servo_WriteUS(uint16_t us)
 
 // Global servo center position (can be tweaked)
 volatile int32_t SERVO_CENTER_US = 1500;
-float TURN_ARC_AT_MAX_STEER_CM = 40.0f; // arc length when steering is 45°
+float TURN_RADIUS = 25.0f; // min turning radius (cm) when steering is 45°
 
 /**
  * @brief Map steering direction (deg) to servo PWM microsecond value
@@ -913,9 +914,9 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    //Motor_forward(pwm);                        //feb 23
+    Motor_forward(pwm);                        //feb 23
     //Motor_forward_simple(pwm);
-    Motor_forward_advanced(pwm);             //feb 23
+    //Motor_forward_advanced(pwm);             //feb 23
 
     // Display progress
     //snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1139,7 +1140,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
     last_time = HAL_GetTick();
     uint32_t start_time = HAL_GetTick();
     uint32_t last_slow_tick = 0;
-    const uint32_t timeout_ms = 15000;
+    const uint32_t timeout_ms = 60000;
 
     while (1)
     {
@@ -1152,7 +1153,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
             cm_now = cm_travelled_forward();
         }
 
-        const float OVERSHOOT_OFFSET = 2.0f; 
+        const float OVERSHOOT_OFFSET = 0.0f; 
         uint8_t angle_reached = (target_deg_abs > OVERSHOOT_OFFSET) && (abs_yaw >= (target_deg_abs - OVERSHOOT_OFFSET));
         uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
         if (angle_reached || distance_reached) {
@@ -1269,7 +1270,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
     last_time = HAL_GetTick();
     uint32_t start_time = HAL_GetTick();
     uint32_t last_slow_tick = 0;
-    const uint32_t timeout_ms = 15000;
+    const uint32_t timeout_ms = 60000;
 
     while (1)
     {
@@ -1282,7 +1283,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
             cm_now = cm_travelled_reverse();
         }
 
-        const float OVERSHOOT_OFFSET = 2.0f; 
+        const float OVERSHOOT_OFFSET = 0.0f; 
         uint8_t angle_reached = (target_deg_abs > OVERSHOOT_OFFSET) && (abs_yaw >= (target_deg_abs - OVERSHOOT_OFFSET));
         uint8_t distance_reached = use_distance && (cm_now >= (target_cm_abs - stop_tol_cm));
         if (angle_reached || distance_reached) {
@@ -1368,8 +1369,9 @@ void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
     float arc_length_cm = fabsf(target_cm);
     float steer_mag_deg = 45.0f;
 
-    if (arc_length_cm > 0.0f && TURN_ARC_AT_MAX_STEER_CM > 0.0f) {
-        steer_mag_deg = 45.0f * (TURN_ARC_AT_MAX_STEER_CM / arc_length_cm);
+    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
+        // steer = (PI / 4) * TURN_RADIUS * target_deg / arc_length_cm
+        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
     }
 
     if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
@@ -1378,7 +1380,7 @@ void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
     int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
     if (steer_angle > 45) steer_angle = 45;
 
-    Turn_Car(target_deg, pwmVal, (int)(-steer_angle), 0);
+    Turn_Car(target_deg, pwmVal, (int)(-steer_angle), target_cm);
 }
 
 void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
@@ -1387,8 +1389,8 @@ void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
     float arc_length_cm = fabsf(target_cm);
     float steer_mag_deg = 45.0f;
 
-    if (arc_length_cm > 0.0f && TURN_ARC_AT_MAX_STEER_CM > 0.0f) {
-        steer_mag_deg = 45.0f * (TURN_ARC_AT_MAX_STEER_CM / arc_length_cm);
+    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
+        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
     }
 
     if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
@@ -1397,7 +1399,7 @@ void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
     int16_t steer_angle = (int16_t)roundf(steer_mag_deg);
     if (steer_angle > 45) steer_angle = 45;
 
-    Turn_Car_Reverse(target_deg, pwmVal, (int)(-steer_angle), 0);
+    Turn_Car_Reverse(target_deg, pwmVal, (int)(-steer_angle), target_cm);
 }
 
 void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
@@ -1405,8 +1407,8 @@ void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
     float arc_length_cm = fabsf(target_cm);
     float steer_mag_deg = 45.0f;
 
-    if (arc_length_cm > 0.0f && TURN_ARC_AT_MAX_STEER_CM > 0.0f) {
-        steer_mag_deg = 45.0f * (TURN_ARC_AT_MAX_STEER_CM / arc_length_cm);
+    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
+        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
     }
 
     if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
@@ -1423,8 +1425,8 @@ void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm)
     float arc_length_cm = fabsf(target_cm);
     float steer_mag_deg = 45.0f;
 
-    if (arc_length_cm > 0.0f && TURN_ARC_AT_MAX_STEER_CM > 0.0f) {
-        steer_mag_deg = 45.0f * (TURN_ARC_AT_MAX_STEER_CM / arc_length_cm);
+    if (arc_length_cm > 0.0f && target_deg > 0.0f) {
+        steer_mag_deg = (target_deg * PI * TURN_RADIUS) / (4.0f * arc_length_cm);
     }
 
     if (steer_mag_deg > 45.0f) steer_mag_deg = 45.0f;
@@ -1678,6 +1680,7 @@ int main(void)
 
   Servo_SetAngle_Safe(0,1);
   HAL_Delay(1000);
+  OLED_Clear();
   //Steering_ToUS(-30);
     // HAL_Delay(2000);
 
@@ -1711,7 +1714,12 @@ int main(void)
   //HAL_Delay(5000);
 
   //Measure_Motor_Speed_forward(3000); // Live RPM Comparison
-  //Turn_Car(180.0f, 2500, 40,0);     // Test rotation
+  //Turn_Car(360.0f, pwmMin, 45,0);     // Test rotation
+  // cmd_turn_left(90.0f, pwmMin, 40.84f);
+
+  // HAL_Delay(10000);
+  // cmd_turn_left(90.0f, pwmMin, 60.0f);
+  //Turn_Car(360.0f, pwmMin, -45,0);
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
  // Turn_Car(-180.0f, 2500, -40,0);
 

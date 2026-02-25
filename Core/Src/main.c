@@ -324,7 +324,7 @@ void Motor_forward_simple(int pwmVal)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
 
  sprintf(buf, "PWM = %4dF ", pwmVal);
- OLED_ShowString(0, 20, buf);
+ OLED_ShowString(0, 10, buf);
 }
 
 void Motor_forward_advanced(int pwmVal)
@@ -355,7 +355,7 @@ void Motor_forward_advanced(int pwmVal)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, right_cmd);
 
  sprintf(buf, "PWM L = %4dR = %4d ", left_cmd, right_cmd);
- OLED_ShowString(0, 20, buf);
+ OLED_ShowString(0, 10, buf);
 }
 
 void Motor_reverse_advanced(int pwmVal)
@@ -386,7 +386,7 @@ void Motor_reverse_advanced(int pwmVal)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 
  sprintf(buf, "PWM L = %4dR = %4d ", left_cmd, right_cmd);
- OLED_ShowString(0, 20, buf);
+ OLED_ShowString(0, 10, buf);
 }
 
 
@@ -401,7 +401,7 @@ void Motor_reverse_simple(int pwmVal)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 
  sprintf(buf, "PWM = %4dF ", pwmVal);
- OLED_ShowString(0, 20, buf);
+ OLED_ShowString(0, 10, buf);
 }
 
 //THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
@@ -893,7 +893,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 //     Emergency stop for obstacles
     if (HCSR04_Read() <= 20){
       Motor_stop();
-      OLED_ShowString(0, 40, "Obstacle detected!");
+      OLED_ShowString(0, 30, "Obstacle detected!");
       HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
       HAL_Delay(1000);
       HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
@@ -967,7 +967,7 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
 
     // Display progress
     snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 20, (uint8_t*)buf);
+    OLED_ShowString(0, 10, (uint8_t*)buf);
     OLED_Refresh_Gram();
 
     HAL_Delay(10);
@@ -987,7 +987,7 @@ void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm)
 
     // Display initial status
     sprintf(buf, "Moving forward...");
-    OLED_ShowString(0, 10, (uint8_t*)buf);
+    OLED_ShowString(0, 00, (uint8_t*)buf);
     OLED_Refresh_Gram();
 
     while (1) {
@@ -996,7 +996,7 @@ void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm)
 
         // Display current distance
         sprintf(buf, "Dist: %lu cm", distance);
-        OLED_ShowString(0, 20, (uint8_t*)buf);
+        OLED_ShowString(0, 10, (uint8_t*)buf);
         OLED_Refresh_Gram();
 
         // Check if obstacle is detected
@@ -1006,7 +1006,7 @@ void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm)
 
             // Provide feedback
             sprintf(buf, "Obstacle at %lu cm!", distance);
-            OLED_ShowString(0, 30, (uint8_t*)buf);
+            OLED_ShowString(0, 20, (uint8_t*)buf);
             HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET); // Alert buzzer
             OLED_Refresh_Gram();
 
@@ -1206,7 +1206,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 //            }
             snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
                      abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-            OLED_ShowString(0, 40, (uint8_t*)buf);
+            OLED_ShowString(0, 30, (uint8_t*)buf);
             OLED_Refresh_Gram();
         }
 
@@ -1227,7 +1227,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 //    }
     cm_now = cm_travelled_forward();
     snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
-    OLED_ShowString(0, 40, (uint8_t*)buf);
+    OLED_ShowString(0, 30, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
 
@@ -1337,7 +1337,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 
             snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
                      abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-            OLED_ShowString(0, 40, (uint8_t*)buf);
+            OLED_ShowString(0, 30, (uint8_t*)buf);
             OLED_Refresh_Gram();
         }
 
@@ -1358,7 +1358,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 //    }
     cm_now = cm_travelled_reverse();
     snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
-    OLED_ShowString(0, 40, (uint8_t*)buf);
+    OLED_ShowString(0, 30, (uint8_t*)buf);
     OLED_Refresh_Gram();
 }
 

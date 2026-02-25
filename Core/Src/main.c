@@ -333,7 +333,7 @@ void Motor_forward_simple(int pwmVal)
 void Motor_forward_advanced(int pwmVal)
 {
   //Gain
-  const float Kp_balance = 500.0f;
+  const float Kp_balance = 50.0f;
 
   // --- encoder balancing (dir-safe) ---
   int32_t dL = left_ticks_forward();
@@ -364,7 +364,7 @@ void Motor_forward_advanced(int pwmVal)
 void Motor_reverse_advanced(int pwmVal)
 {
   //Gain
-  const float Kp_balance = 500.0f;
+  const float Kp_balance = 50.0f;
 
   // --- encoder balancing (dir-safe) ---
   int32_t dL = left_ticks_reverse();
@@ -1635,52 +1635,46 @@ int main(void)
   Servo_SetAngle_Safe(0,1);
   HAL_Delay(1000);
   OLED_Clear();
-  //Steering_ToUS(-30);
-    // HAL_Delay(2000);
-
-
-
-
-  //Motor_forward(1500);
-
 
   
-
-
-  // Drive_Forward_ToCM(200,3000);
-
-  // Drive_Forward_ToCM(100,3000);
-  // HAL_Delay(10000);
-  // Drive_Reverse_ToCM(100,3000);
-  // HAL_Delay(5000);
-
-
-
-
-  
-
 
 
   /********************************our testing*** */
-  cmd_turn_left_reverse(40,3000,21.89f);
-  HAL_Delay(3000);
-  cmd_turn_right(40,3000,29.31f);
-  HAL_Delay(3000);
-  cmd_turn_left(40,3000,51.21f);
-  HAL_Delay(3000);
-  Drive_Reverse_ToCM(15,3000);
-  HAL_Delay(3000);
-  cmd_turn_left_reverse(40,3000,15.0f);
-  HAL_Delay(3000);
-  cmd_turn_right(40,3000,17.655f);
-  HAL_Delay(3000);
-  Drive_Forward_ToCM(38.134,3000);
-  HAL_Delay(3000);
-  cmd_turn_left(40,3000,71.9256f);
 
-
-
-
+//// Path 1: Obstacle at (70, 70) face L
+//cmd_turn_left(40, 3000, 3.86);
+//Drive_Forward_ToCM(28.65, 3000);
+//cmd_turn_right(40, 3000, 43.13);
+//HAL_Delay(3000);
+//
+//// Path 2: Obstacle at (70, 70) face D
+//Drive_Reverse_ToCM(15.0, 3000);
+//cmd_turn_left_reverse(40, 3000, 15.0);
+//cmd_turn_right(40, 3000, 20.68);
+//Drive_Forward_ToCM(26.16, 3000);
+//cmd_turn_left(40, 3000, 74.95);
+//HAL_Delay(3000);
+//
+//// Path 3: Obstacle at (70, 70) face R
+//Drive_Reverse_ToCM(15.0, 3000);
+//cmd_turn_left_reverse(40, 3000, 15.0);
+//cmd_turn_right(40, 3000, 20.68);
+//Drive_Forward_ToCM(26.16, 3000);
+//cmd_turn_left(40, 3000, 74.95);
+//HAL_Delay(3000);
+//
+//// Path 4: Obstacle at (70, 70) face U
+//Drive_Reverse_ToCM(15.0, 3000);
+//cmd_turn_left_reverse(40, 3000, 15.0);
+//cmd_turn_right(40, 3000, 20.68);
+//Drive_Forward_ToCM(26.16, 3000);
+//cmd_turn_left(40, 3000, 74.95);
+//HAL_Delay(3000);
+//
+//
+//
+//
+//
 
 
 

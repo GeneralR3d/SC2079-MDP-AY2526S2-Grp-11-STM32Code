@@ -20,8 +20,8 @@ UART_HandleTypeDef huart3;
 //------------------------------------------
 //Global variables
 //------------------------------------------
-static int PWM_TRIM_FORWARD = -500;       // negative slows the left side to fix veer-right
-static int PWM_TRIM_REVERSE = -500;       // positive slows the right side to fix veer-left
+static int PWM_TRIM_FORWARD = -450;       // negative slows the left side to fix veer-right
+static int PWM_TRIM_REVERSE = -450;       // positive slows the right side to fix veer-left
 
 // average distance using the calibrated scales
 // if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be smaller
@@ -29,8 +29,8 @@ static int PWM_TRIM_REVERSE = -500;       // positive slows the right side to fi
 
 // const float COUNTS_PER_CM_L = 74.0467f;
 // const float COUNTS_PER_CM_R = 70.6355f;
-const float COUNTS_PER_CM_L = 77.0f;
-const float COUNTS_PER_CM_R = 80.0f;
+const float COUNTS_PER_CM_L = 75.5f;
+const float COUNTS_PER_CM_R = 75.5f;
 
 float yaw_angle = 0;   // global or static variable
 uint32_t last_time = 0;
@@ -333,7 +333,7 @@ void Motor_forward_simple(int pwmVal)
 void Motor_forward_advanced(int pwmVal)
 {
   //Gain
-  const float Kp_balance = 50.0f;
+  const float Kp_balance = 500.0f;
 
   // --- encoder balancing (dir-safe) ---
   int32_t dL = left_ticks_forward();
@@ -364,7 +364,7 @@ void Motor_forward_advanced(int pwmVal)
 void Motor_reverse_advanced(int pwmVal)
 {
   //Gain
-  const float Kp_balance = 50.0f;
+  const float Kp_balance = 500.0f;
 
   // --- encoder balancing (dir-safe) ---
   int32_t dL = left_ticks_reverse();
@@ -917,20 +917,20 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin) pwm = pwmMin;
 
     //Motor_forward(pwm);                        //feb 23
-    Motor_forward_simple(pwm);
-    //Motor_forward_advanced(pwm);             //feb 23
+    //Motor_forward_simple(pwm);
+    Motor_forward_advanced(pwm);             //feb 23
 
     // Display progress
-    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 10, (uint8_t*)buf);
+    //snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    //OLED_ShowString(0, 10, (uint8_t*)buf);
     // // show left encoder ticks for debugging
-    //int32_t l = left_ticks_forward();
-    //snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
-    //OLED_ShowString(0, 20, (uint8_t*)buf);
+    int32_t l = left_ticks_forward();
+    snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
+    OLED_ShowString(0, 20, (uint8_t*)buf);
 
-    //int32_t r = right_ticks_forward();
-    //snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    //OLED_ShowString(0, 30, (uint8_t*)buf);
+    int32_t r = right_ticks_forward();
+    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    OLED_ShowString(0, 30, (uint8_t*)buf);
 
     OLED_Refresh_Gram();
 
@@ -965,8 +965,8 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin) pwm = pwmMin;
 
     //Motor_reverse(pwm);
-    Motor_reverse_simple(pwm);
-    //Motor_reverse_advanced(pwm);
+    //Motor_reverse_simple(pwm);
+    Motor_reverse_advanced(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
@@ -1365,7 +1365,7 @@ void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
     target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    Turn_Car(target_deg, pwmVal, -45, target_cm);
+    Turn_Car(target_deg, pwmVal, -45,0);
 }
 
 void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
@@ -1373,7 +1373,7 @@ void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
     target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, pwmVal, -45, target_cm);
+    Turn_Car_Reverse(target_deg, pwmVal, -45, 0);
 }
 
 void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
@@ -1649,10 +1649,34 @@ int main(void)
 
   // Drive_Forward_ToCM(200,3000);
 
-  Drive_Forward_ToCM(100,3000);
-  HAL_Delay(10000);
-  Drive_Reverse_ToCM(100,3000);
+  // Drive_Forward_ToCM(100,3000);
+  // HAL_Delay(10000);
+  // Drive_Reverse_ToCM(100,3000);
   // HAL_Delay(5000);
+
+
+
+
+  
+
+
+
+  /********************************our testing*** */
+  cmd_turn_left_reverse(40,3000,21.89f);
+  HAL_Delay(3000);
+  cmd_turn_right(40,3000,29.31f);
+  HAL_Delay(3000);
+  cmd_turn_left(40,3000,51.21f);
+  HAL_Delay(3000);
+  Drive_Reverse_ToCM(15,3000);
+  HAL_Delay(3000);
+  cmd_turn_left_reverse(40,3000,15.0f);
+  HAL_Delay(3000);
+  cmd_turn_right(40,3000,17.655f);
+  HAL_Delay(3000);
+  Drive_Forward_ToCM(38.134,3000);
+  HAL_Delay(3000);
+  cmd_turn_left(40,3000,71.9256f);
 
 
 

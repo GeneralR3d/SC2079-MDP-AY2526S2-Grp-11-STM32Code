@@ -1323,13 +1323,6 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
         // Run non-critical slow tasks (US sensor, OLED) only every 50ms
         if (loop_tick - last_slow_tick > 50) {
             last_slow_tick = loop_tick;
-            if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
-          HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-                Motor_stop();
-            HAL_Delay(1000);
-            HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-                break;
-            }
 
         // Debug output
 //            if (use_distance) {

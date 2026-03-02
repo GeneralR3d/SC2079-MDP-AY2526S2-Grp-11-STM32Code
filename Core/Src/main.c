@@ -29,8 +29,14 @@ static int PWM_TRIM_REVERSE = -450;       // positive slows the right side to fi
 
 // const float COUNTS_PER_CM_L = 74.0467f;
 // const float COUNTS_PER_CM_R = 70.6355f;
-const float COUNTS_PER_CM_L = 75.5f;
-const float COUNTS_PER_CM_R = 75.5f;
+//const float COUNTS_PER_CM_L = 75.5f;
+//const float COUNTS_PER_CM_R = 75.5f;
+
+
+const float COUNTS_PER_CM_L = 73.7f;
+const float COUNTS_PER_CM_R = 77.5f;
+
+
 
 float yaw_angle = 0;   // global or static variable
 uint32_t last_time = 0;
@@ -133,7 +139,9 @@ static inline void _Servo_WriteUS(uint16_t us)
 }
 
 // Global servo center position (can be tweaked)
-volatile int32_t SERVO_CENTER_US = 1500;
+volatile int32_t SERVO_CENTER_US = 1477;
+//1475 is left
+//1480 is right
 float TURN_RADIUS = 25.0f; // min turning radius (cm) when steering is 45°
 
 /**
@@ -895,12 +903,12 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   while (1) {
 //     Emergency stop for obstacles
     if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM){
-      Motor_stop();
+      //Motor_stop();
       OLED_ShowString(0, 30, "Obstacle detected!");
       HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
       HAL_Delay(1000);
       HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-      break;
+      //break;
     }
 
     float cm_now  = cm_travelled_forward();
@@ -1195,10 +1203,10 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
             last_slow_tick = loop_tick;
             if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
           HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-                Motor_stop();
+                //Motor_stop();
             HAL_Delay(1000);
             HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-                break;
+                //break;
             }
 
         // Debug output
@@ -1680,12 +1688,19 @@ int main(void)
 
 
 
-  
+//
+//
+//
+//  Drive_Forward_ToCM(25,1500);
+//  HAL_Delay(5000);
+//  Drive_Forward_ToCM(50,1500);
+//  HAL_Delay(5000);
+//  Drive_Forward_ToCM(75,1500);
+//  HAL_Delay(5000);
+//  Drive_Forward_ToCM(100,1500);
+//  HAL_Delay(5000);
 
-
-  //Drive_Forward_ToCM(200,1500);
-  //HAL_Delay(5000);
-
+//  HAL_Delay(5000);
   //Measure_Motor_Speed_forward(3000); // Live RPM Comparison
   //Turn_Car(360.0f, pwmMin, 45,0);     // Test rotation
   // cmd_turn_left(90.0f, pwmMin, 40.84f);

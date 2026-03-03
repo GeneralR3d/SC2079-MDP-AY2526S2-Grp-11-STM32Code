@@ -745,14 +745,14 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
 }
 
 /* *
- * Uses piecewise linear interpolation over 8 measured (mv, cm) pairs.
+ * Uses piecewise linear interpolation over 13 measured (mv, cm) pairs.
  * This is more accurate than a single analytical formula because the
  * sensor response has near-field and far-field roll-off that no simple
  * curve fits well across the full 5–70 cm range.
  *
  * Calibration data (measured):
- *   mv : 3080  2453  1295  840  630  510  435  337
- *   cm :    5    10    20   30   40   50   60   70
+ *   mv : 3080  3030  2680  2520  2453  1650  1295  1080  840  630  510  435  337
+ *   cm :    5    7     8     9     10    15    20    25   30   40   50   60   70
  *
  * For any mv strictly between two table entries the output is linearly
  * interpolated.  Inputs outside [220, 3079] mV are clamped to [5, 70] cm.
@@ -760,10 +760,9 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
 static inline float dist_cm_from_mv_6(uint32_t mv)
 {
     /* Calibration table — mv sorted descending (close→far) */
-    static const uint32_t mv_lut[] = {3080, 2453, 1295, 840, 630, 510, 435, 337};
-    static const float    cm_lut[] = { 5.0f, 10.0f, 20.0f, 30.0f,
-                                       40.0f, 50.0f, 60.0f, 70.0f};
-    const int N = 8;
+    static const uint32_t mv_lut[] = {3080, 3030, 2680, 2520, 2453, 1650, 1295, 1080, 840, 630, 510, 435, 337};
+    static const float    cm_lut[] = { 5.0f, 7.0f, 8.0f, 9.0f, 10.0f, 15.0f, 20.0f, 25.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f};
+    const int N = 13;
 
     /* Clamp out-of-range inputs */
     if (mv >= mv_lut[0])       return cm_lut[0];
@@ -789,8 +788,8 @@ static inline float dist_cm_from_mv_6(uint32_t mv)
  * curve fits well across the full 5–70 cm range.
  *
  * Calibration data (measured):
- *   mv : 3079  2515  1280  800  610  510  415  220
- *   cm :    5    10    20   30   40   50   60   70
+ *   mv : 3079  3045  2770  2545  2480  1750  1365  1115  800  610  510  415  220
+ *   cm :    5    7     8     9     10    15    20   25   30   40   50   60   70
  *
  * For any mv strictly between two table entries the output is linearly
  * interpolated.  Inputs outside [220, 3079] mV are clamped to [5, 70] cm.
@@ -798,10 +797,9 @@ static inline float dist_cm_from_mv_6(uint32_t mv)
 static inline float dist_cm_from_mv_7(uint32_t mv)
 {
     /* Calibration table — mv sorted descending (close→far) */
-    static const uint32_t mv_lut[] = {3079, 2515, 1280, 800, 610, 510, 415, 220};
-    static const float    cm_lut[] = { 5.0f, 10.0f, 20.0f, 30.0f,
-                                       40.0f, 50.0f, 60.0f, 70.0f};
-    const int N = 8;
+    static const uint32_t mv_lut[] = {3079, 3045, 2770, 2545, 2480, 1750, 1365, 1115, 800, 610, 510, 415, 220};
+    static const float    cm_lut[] = { 5.0f, 7.0f, 8.0f, 9.0f, 10.0f, 15.0f, 20.0f, 25.0f, 30.0f, 40.0f, 50.0f, 60.0f, 70.0f};
+    const int N = 13;
 
     /* Clamp out-of-range inputs */
     if (mv >= mv_lut[0])       return cm_lut[0];

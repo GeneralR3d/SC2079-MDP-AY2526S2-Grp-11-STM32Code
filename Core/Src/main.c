@@ -176,7 +176,7 @@ uint16_t Steering_ToUS(int16_t steer_angle)
         us = SERVO_CENTER_US + (int32_t)steer_angle * (2380 - SERVO_CENTER_US) / 45;
     } else {
         // Negative range: 0 to -45 deg -> SERVO_CENTER_US to 950
-        // Slope = (SERVO_CENTER_US - 900) / 45
+        // Slope = (SERVO_CENTER_US - 961) / 45
         // Note: steer_angle is negative, so we add (negative * positive_slope) which subtracts
         us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 961) / 45;
     }
@@ -1747,7 +1747,7 @@ int main(void)
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
-  //Servo_SetAngle_Safe(0,0);
+  Servo_SetAngle_Safe(0,0);
   HAL_Delay(1000);
   OLED_Clear();
 
@@ -1804,24 +1804,25 @@ int main(void)
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
  // Turn_Car(-180.0f, 2500, -40,0);
 
-  // while (1){
-	// // Below section is for the RPI command unloading and execution
-	// uint8_t ch;
-	// if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+  while (1){
+	// Below section is for the RPI command unloading and execution
+	uint8_t ch;
+	if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
     
-	// 	  if (ch == '\n' || ch == '\r') {
-	// 		  if (cmd_index > 0) {
-	// 			  cmd_buf[cmd_index] = '\0';
+		  if (ch == '\n' || ch == '\r') {
+			  if (cmd_index > 0) {
+				  cmd_buf[cmd_index] = '\0';
 
-	// 		  	  process_command(cmd_buf);
-	// 		  	  cmd_index = 0;
-	// 		  }
-	// 	  } else {
-	// 		  if (cmd_index < CMD_BUF_LEN - 1) {
-	// 			  cmd_buf[cmd_index++] = ch;
-	//           }
-	//       }
-	// }
+			  	  process_command(cmd_buf);
+			  	  cmd_index = 0;
+			  }
+		  } else {
+			  if (cmd_index < CMD_BUF_LEN - 1) {
+				  cmd_buf[cmd_index++] = ch;
+	          }
+	      }
+	}
+}
 
 	// uint32_t distance = HCSR04_Read();
 

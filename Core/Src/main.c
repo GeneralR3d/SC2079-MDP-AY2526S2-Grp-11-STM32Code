@@ -131,8 +131,8 @@ LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Steering_ToUS() instead*/
 
 static inline void _Servo_WriteUS(uint16_t us)
 {
-  if (us < 950)
-    us = 950;
+  if (us < 870)
+    us = 870;
   if (us > 2380)
     us = 2380;
   __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
@@ -173,8 +173,10 @@ uint16_t Steering_ToUS(int16_t steer_angle)
         // Negative range: 0 to -45 deg -> SERVO_CENTER_US to 950
         // Slope = (SERVO_CENTER_US - 950) / 45
         // Note: steer_angle is negative, so we add (negative * positive_slope) which subtracts
-        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 950) / 45;
+        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 870) / 45;
     }
+
+
 
 
     _Servo_WriteUS((uint16_t)us);
@@ -1703,12 +1705,12 @@ int main(void)
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
-  Servo_SetAngle_Safe(0,1);
+  Servo_SetAngle_Safe(0,0);
   HAL_Delay(1000);
   OLED_Clear();
 
-  
 
+  
 
   /********************************our testing*** */
 
@@ -1849,46 +1851,29 @@ int main(void)
     // Refresh OLED
     //OLED_Refresh_Gram();
 
-    while (1){
-        // IR6 PA6 = ADC1_IN6
-        raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
-        mv6  = (uint32_t)raw6 * 3300u / 4095u;
-        dist6 = dist_cm_from_mv_6(mv6);
+    /******** IR Sensor Code *******************************************/
+    // while (1){
+    //     // IR6 PA6 = ADC1_IN6
+    //     raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
+    //     mv6  = (uint32_t)raw6 * 3300u / 4095u;
+    //     dist6 = dist_cm_from_mv_6(mv6);
 
 
-        // IR7 PA7 = ADC1_IN7
-        raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
-        mv7  = (uint32_t)raw7 * 3300u / 4095u;
-        dist7 = dist_cm_from_mv_7(mv7);
+    //     // IR7 PA7 = ADC1_IN7
+    //     raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
+    //     mv7  = (uint32_t)raw7 * 3300u / 4095u;
+    //     dist7 = dist_cm_from_mv_7(mv7);
 
-        sprintf(buf, "IR6 = %.2f cm | IR7 = %.2f cm\r\n", dist6, dist7);
-        OLED_ShowString(0, 20, (uint8_t*)buf);
-        OLED_Refresh_Gram();
-        HAL_Delay(100);
-    }
+    //     sprintf(buf, "IR6 = %.2f cm | IR7 = %.2f cm\r\n", dist6, dist7);
+    //     OLED_ShowString(0, 20, (uint8_t*)buf);
+    //     OLED_Refresh_Gram();
+    //     HAL_Delay(100);
+    // }
+    /******** IR Sensor Code END ************************/
 
 
 
-    /*
-        printf("IR4 = %.1f cm | IR5 = %.1f cm\r\n", dist4, dist5);
-        // Forward fast
-        Motor_forward(5000);   // ~60–70 RPM
-        HAL_Delay(3000);
-        Motor_reverse(5000);   // ~60–70 RPM
-        HAL_Delay(3000);
 
-          //pwmVal 250  > RPM = 0
-          //pwmVal 260 >  RPM = 1
-          //pwmVal 270  > RPM = 2
-          //pwmVal 300  > RPM 2
-          //pwmVal 1000 > RPM = 10
-          //pwmVal 3000 > RPM = 36
-          //pwmVal 5000 > RPM ~ 60
-          //pwmVal 6000 > RPM ~ 75
-
-          OLED_ShowString(15, 40, "Motor Moving"); // show message on OLED display at line 40)
-          OLED_Refresh_Gram();
-    */
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

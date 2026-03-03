@@ -40,7 +40,7 @@ const float COUNTS_PER_CM_R = 77.5f;
 volatile int32_t SERVO_CENTER_US = 1477;
 //1475 is left
 //1480 is right
-float TURN_RADIUS = 25.0f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS = 24.75f; // min turning radius (cm) when steering is 45°
 
 // Ackermann differential steering constants (measure your car!)
 #define WHEELBASE_CM    14.5f   // distance from front axle to rear axle
@@ -141,8 +141,8 @@ LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Steering_ToUS() instead*/
 
 static inline void _Servo_WriteUS(uint16_t us)
 {
-  if (us < 900)
-    us = 900;
+  if (us < 961)
+    us = 961;
   if (us > 2380)
     us = 2380;
   __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
@@ -178,7 +178,7 @@ uint16_t Steering_ToUS(int16_t steer_angle)
         // Negative range: 0 to -45 deg -> SERVO_CENTER_US to 950
         // Slope = (SERVO_CENTER_US - 900) / 45
         // Note: steer_angle is negative, so we add (negative * positive_slope) which subtracts
-        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 900) / 45;
+        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 961) / 45;
     }
 
 
@@ -1747,15 +1747,19 @@ int main(void)
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
-  Servo_SetAngle_Safe(0,0);
+  //Servo_SetAngle_Safe(0,0);
   HAL_Delay(1000);
   OLED_Clear();
 
-    Turn_Car_Reverse(360.0f, 3000, 45, 0);
-      HAL_Delay(5000);
-        Turn_Car_Reverse(360.0f, 2000,  45, 0);
-          HAL_Delay(5000);
-            Turn_Car_Reverse(360.0f, 1500, 45, 0);
+    Turn_Car(360.0f, 3000, -45, 0);
+
+  // for(int i = 1050; i>= 900; i--){
+  //   _Servo_WriteUS(i);
+  //   sprintf(buf, "PWM: %d", i);
+  //   OLED_ShowString(0, 0, (uint8_t *)buf);
+  //   OLED_Refresh_Gram();
+  //   HAL_Delay(10000);
+  // }
 
 
 

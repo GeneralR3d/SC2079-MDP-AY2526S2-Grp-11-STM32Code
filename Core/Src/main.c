@@ -48,9 +48,9 @@ char cmd_buf[CMD_BUF_LEN];
 int cmd_index = 0;
 
 // IR global variables
-volatile uint16_t raw4, raw5;
-volatile uint32_t mv4, mv5;
-volatile float dist4, dist5;
+volatile uint16_t raw6, raw7;
+volatile uint32_t mv6, mv7;
+volatile float dist6, dist7;
 volatile float ax_g, ay_g, az_g, gx_dps, gy_dps, gz_dps;
 // --- ICM20948 address / WHO_AM_I ---
 #define WHO_AM_I 0x00
@@ -724,14 +724,18 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
   return v;
 }
 
-static inline float dist_cm_from_mv_5(uint32_t mv)
+static inline float dist_cm_from_mv_6(uint32_t mv)
 {
-  const float A = 104.0f;         // mV
-  const float B = 23730.0f;       // mV·cm
-  if (mv <= (uint32_t)(A + 1.0f)) // avoid divide-by-zero / nonsense
-    return 80.0f;                 // clamp to far limit
-  float d = B / ((float)mv - A);
-  // optional clamping to expected range (adjust to your setup)
+  if (mv == 0) return 80.0f; // avoid division by zero
+  
+  // Power law regression Y = A * X^B where Y = MV, X = CM
+  // A = 1.088e+04, B = -7.387e-01
+  // Therefore, CM = pow((MV / A), (1 / B))
+  const float A = 1.048e4f;
+  const float B = -0.7209f;
+  float d = powf((float)mv / A, 1.0f / B);
+  
+  // optional clamping to expected range
   if (d < 4.0f)
     d = 4.0f;
   if (d > 80.0f)
@@ -739,14 +743,18 @@ static inline float dist_cm_from_mv_5(uint32_t mv)
   return d;
 }
 
-static inline float dist_cm_from_mv_4(uint32_t mv)
+static inline float dist_cm_from_mv_7(uint32_t mv)
 {
-  const float A = 45.22f;         // mV
-  const float B = 22380.0f;       // mV·cm
-  if (mv <= (uint32_t)(A + 1.0f)) // avoid divide-by-zero / nonsense
-    return 80.0f;                 // clamp to far limit
-  float d = B / ((float)mv - A);
-  // optional clamping to expected range (adjust to your setup)
+  if (mv == 0) return 80.0f; // avoid division by zero
+  
+  // Power law regression Y = A * X^B where Y = MV, X = CM
+  // A = 1.088e+04, B = -7.387e-01
+  // Therefore, CM = pow((MV / A), (1 / B))
+  const float A = 1.088e4f;
+  const float B = -0.7387f;
+  float d = powf((float)mv / A, 1.0f / B);
+  
+  // optional clamping to expected range
   if (d < 4.0f)
     d = 4.0f;
   if (d > 80.0f)
@@ -1688,52 +1696,30 @@ int main(void)
 
 
 
-//
-//
-//
-//  Drive_Forward_ToCM(25,1500);
-//  HAL_Delay(5000);
-//  Drive_Forward_ToCM(50,1500);
-//  HAL_Delay(5000);
-//  Drive_Forward_ToCM(75,1500);
-//  HAL_Delay(5000);
-//  Drive_Forward_ToCM(100,1500);
-//  HAL_Delay(5000);
-
-//  HAL_Delay(5000);
-  //Measure_Motor_Speed_forward(3000); // Live RPM Comparison
-  //Turn_Car(360.0f, pwmMin, 45,0);     // Test rotation
-  // cmd_turn_left(90.0f, pwmMin, 40.84f);
-
   // HAL_Delay(10000);
   // cmd_turn_left(90.0f, pwmMin, 60.0f);
   //Turn_Car(360.0f, pwmMin, -45,0);
   //Continuous_Complex_Obstacle_Avoidance(3000, 2500);
  // Turn_Car(-180.0f, 2500, -40,0);
 
-  //heree
-	//target rotation
-	//Turn_Car(180.0f, 2500, 40);   // rotate ~90° with servo at 40°
-  //Servo_SetAngle_Safe(0,1);
-//	Turn_Car(180.0f, 2500, 25);  // rotate ~180°
-  while (1){
-	// Below section is for the RPI command unloading and execution
-	uint8_t ch;
-	if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+  // while (1){
+	// // Below section is for the RPI command unloading and execution
+	// uint8_t ch;
+	// if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
     
-		  if (ch == '\n' || ch == '\r') {
-			  if (cmd_index > 0) {
-				  cmd_buf[cmd_index] = '\0';
+	// 	  if (ch == '\n' || ch == '\r') {
+	// 		  if (cmd_index > 0) {
+	// 			  cmd_buf[cmd_index] = '\0';
 
-			  	  process_command(cmd_buf);
-			  	  cmd_index = 0;
-			  }
-		  } else {
-			  if (cmd_index < CMD_BUF_LEN - 1) {
-				  cmd_buf[cmd_index++] = ch;
-	          }
-	      }
-	}
+	// 		  	  process_command(cmd_buf);
+	// 		  	  cmd_index = 0;
+	// 		  }
+	// 	  } else {
+	// 		  if (cmd_index < CMD_BUF_LEN - 1) {
+	// 			  cmd_buf[cmd_index++] = ch;
+	//           }
+	//       }
+	// }
 
 	// uint32_t distance = HCSR04_Read();
 
@@ -1779,11 +1765,6 @@ int main(void)
 
     //OLED_Refresh_Gram();
 
-//    int32_t encA = Encoder_Read_A();
- //   float distA_cm = Encoder_CountsToCM(encA);
-
- //   int32_t encD = Encoder_Read_D();
- //   float distD_cm = Encoder_CountsToCM(encD);
 
     //sprintf(buf, "A: %.2fcm D: %.2fcm", distA_cm, distD_cm);
     //OLED_ShowString(0, 20, (uint8_t*)buf);
@@ -1813,20 +1794,27 @@ int main(void)
     // Refresh OLED
     //OLED_Refresh_Gram();
 
+    while (1){
+        // IR6 PA6 = ADC1_IN6
+        raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
+        mv6  = (uint32_t)raw6 * 3300u / 4095u;
+        dist6 = dist_cm_from_mv_6(mv6);
 
 
-    // HAL_GPIO_TogglePin(GPIOA, LED_Pin);
-    // HAL_Delay(500);
+        // IR7 PA7 = ADC1_IN7
+        raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
+        mv7  = (uint32_t)raw7 * 3300u / 4095u;
+        dist7 = dist_cm_from_mv_7(mv7);
+
+        sprintf(buf, "IR6 = %.2f cm | IR7 = %.2f cm\r\n", dist6, dist7);
+        OLED_ShowString(0, 20, (uint8_t*)buf);
+        OLED_Refresh_Gram();
+        HAL_Delay(100);
+    }
+
+
 
     /*
-        raw4 = adc_read_channel(&hadc1, ADC_CHANNEL_4);
-        mv4  = (uint32_t)raw4 * 3300u / 4095u;
-        dist4 = dist_cm_from_mv_4(mv4);
-
-        // IR2 PA5 = ADC1_IN5
-        raw5 = adc_read_channel(&hadc1, ADC_CHANNEL_5);
-        mv5  = (uint32_t)raw5 * 3300u / 4095u;
-        dist5 = dist_cm_from_mv_5(mv5);
         printf("IR4 = %.1f cm | IR5 = %.1f cm\r\n", dist4, dist5);
         // Forward fast
         Motor_forward(5000);   // ~60–70 RPM
@@ -1849,7 +1837,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-  } // while
+   // while
 
   /* USER CODE END 3 */
 }
@@ -1938,7 +1926,7 @@ static void MX_ADC1_Init(void)
 
   /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
   */
-  sConfig.Channel = ADC_CHANNEL_4;
+  sConfig.Channel = ADC_CHANNEL_6; // just as placeholder during set up
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)

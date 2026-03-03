@@ -440,8 +440,8 @@ void Motor_forward(int pwmVal)
   }
 
   // --- Filter gyro Z-axis (yaw rate) ---
-  float alpha = 0.9f; // closer to 1 = smoother
-  gz_filtered = alpha * gz_filtered + (1.0f - alpha) * gz_dps;
+  float alpha = 0.1f; // weight of NEW value: lower = more smoothing, higher = faster
+  gz_filtered = alpha * gz_dps + (1.0f - alpha) * gz_filtered;
 
   // --- Update heading from filtered gyro ---
   heading += gz_filtered * dt;   // integrate deg/s over time
@@ -523,8 +523,8 @@ void Motor_reverse(int pwmVal)
   }
 
   // --- Filter gyro Z-axis (yaw rate) ---
-  float alpha = 0.9f; // closer to 1 = smoother
-  gz_filtered = alpha * gz_filtered + (1.0f - alpha) * gz_dps;
+  float alpha = 0.1f; // weight of NEW value: lower = more smoothing, higher = faster
+  gz_filtered = alpha * gz_dps + (1.0f - alpha) * gz_filtered;
 
   // --- Update heading from filtered gyro ---
   heading += gz_filtered * dt;   // integrate deg/s over time
@@ -719,11 +719,44 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
 
   HAL_ADC_Start(hadc);
   HAL_ADC_PollForConversion(hadc, 10);
-  uint16_t v = (uint16_t)HAL_ADC_GetValue(hadc);
+  uint16_t raw_v = (uint16_t)HAL_ADC_GetValue(hadc);
   HAL_ADC_Stop(hadc);
-  return v;
+
+  // Implement a first-order Low Pass Filter (Exponential Moving Average) per channel
+  static float filtered_val[19] = {0};
+  static uint8_t initialized[19] = {0};
+  
+  // Extract channel index assuming values like ADC_CHANNEL_6 are 0-18
+  uint32_t ch_idx = channel & 0x1F;
+  
+  if (ch_idx < 19) {
+      if (!initialized[ch_idx]) {
+          filtered_val[ch_idx] = (float)raw_v;
+          initialized[ch_idx] = 1;
+      } else {
+          // Alpha controls weight of NEW value: lower = more smoothing / slower response
+          const float alpha = 0.6f; 
+          filtered_val[ch_idx] = alpha * (float)raw_v + (1.0f - alpha) * filtered_val[ch_idx];
+      }
+      return (uint16_t)filtered_val[ch_idx];
+  }
+
+  return raw_v; // Fallback
 }
 
+/* *
+ * Uses piecewise linear interpolation over 8 measured (mv, cm) pairs.
+ * This is more accurate than a single analytical formula because the
+ * sensor response has near-field and far-field roll-off that no simple
+ * curve fits well across the full 5–70 cm range.
+ *
+ * Calibration data (measured):
+ *   mv : 3080  2453  1295  840  630  510  435  337
+ *   cm :    5    10    20   30   40   50   60   70
+ *
+ * For any mv strictly between two table entries the output is linearly
+ * interpolated.  Inputs outside [220, 3079] mV are clamped to [5, 70] cm.
+ */
 static inline float dist_cm_from_mv_6(uint32_t mv)
 {
     /* Calibration table — mv sorted descending (close→far) */
@@ -1073,7 +1106,7 @@ void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm)
 void Update_Yaw(void)
 {
     static float gz_prev = 0.0f;
-    const float alpha = 0.4f; // Reduced lag - 0.4 is faster response than 0.8
+    const float alpha = 0.6f; // weight of NEW value: higher = faster response / less lag
     const float GZ_DEADZONE = 0.5f;
 
     uint32_t now = HAL_GetTick();
@@ -1091,7 +1124,7 @@ void Update_Yaw(void)
     }
 
     // Use a lighter filter for display/damping, but integrate the raw corrected signal
-    gyro_gz_filtered = alpha * gyro_gz_filtered + (1.0f - alpha) * gz_dps_corrected;
+    gyro_gz_filtered = alpha * gz_dps_corrected + (1.0f - alpha) * gyro_gz_filtered;
 
     // Trapezoidal integration for better precision
     yaw_angle += (gz_prev + gz_dps_corrected) * 0.5f * dt;

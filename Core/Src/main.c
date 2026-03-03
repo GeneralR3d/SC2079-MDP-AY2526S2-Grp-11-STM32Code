@@ -131,8 +131,8 @@ LOW LEVEL FUNCTION DO NOT CALL DIRECTLY, call Steering_ToUS() instead*/
 
 static inline void _Servo_WriteUS(uint16_t us)
 {
-  if (us < 870)
-    us = 870;
+  if (us < 900)
+    us = 900;
   if (us > 2380)
     us = 2380;
   __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
@@ -171,9 +171,9 @@ uint16_t Steering_ToUS(int16_t steer_angle)
         us = SERVO_CENTER_US + (int32_t)steer_angle * (2380 - SERVO_CENTER_US) / 45;
     } else {
         // Negative range: 0 to -45 deg -> SERVO_CENTER_US to 950
-        // Slope = (SERVO_CENTER_US - 950) / 45
+        // Slope = (SERVO_CENTER_US - 900) / 45
         // Note: steer_angle is negative, so we add (negative * positive_slope) which subtracts
-        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 870) / 45;
+        us = SERVO_CENTER_US + (int32_t)steer_angle * (SERVO_CENTER_US - 900) / 45;
     }
 
 

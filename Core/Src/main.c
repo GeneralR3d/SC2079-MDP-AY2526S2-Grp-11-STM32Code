@@ -36,6 +36,16 @@ static int PWM_TRIM_REVERSE = -450;       // positive slows the right side to fi
 const float COUNTS_PER_CM_L = 73.7f;
 const float COUNTS_PER_CM_R = 77.5f;
 
+// Global servo center position (can be tweaked)
+volatile int32_t SERVO_CENTER_US = 1477;
+//1475 is left
+//1480 is right
+float TURN_RADIUS = 25.0f; // min turning radius (cm) when steering is 45°
+
+// Ackermann differential steering constants (measure your car!)
+#define WHEELBASE_CM    14.5f   // distance from front axle to rear axle
+#define TRACK_WIDTH_CM  16.2f   // distance between the two rear wheels
+
 
 
 float yaw_angle = 0;   // global or static variable
@@ -138,11 +148,6 @@ static inline void _Servo_WriteUS(uint16_t us)
   __HAL_TIM_SET_COMPARE(&htim12, TIM_CHANNEL_2, us);
 }
 
-// Global servo center position (can be tweaked)
-volatile int32_t SERVO_CENTER_US = 1477;
-//1475 is left
-//1480 is right
-float TURN_RADIUS = 25.0f; // min turning radius (cm) when steering is 45°
 
 /**
  * @brief Map steering direction (deg) to servo PWM microsecond value
@@ -326,17 +331,18 @@ void Motor_stop(void)
 
 
 //simple motor forward code - no pid control
-void Motor_forward_simple(int pwmVal)
+// Accepts separate PWM for left and right motors (Ackermann support)
+void Motor_forward_simple(int pwmValL, int pwmValR)
 {
- // Motor A: PWM on CH3, CH4 = 0
- __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
+ // Motor A (left): PWM on CH3, CH4 = 0
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmValL);
  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
 
- // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
+ // Motor D (right): PWM on CH4, CH3 = 0 (inverted because wired opposite)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
- __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmValR);
 
- sprintf(buf, "PWM = %4dF ", pwmVal);
+ sprintf(buf, "PWM L=%4d R=%4d ", pwmValL, pwmValR);
  OLED_ShowString(0, 10, buf);
 }
 
@@ -403,17 +409,17 @@ void Motor_reverse_advanced(int pwmVal)
 }
 
 
-void Motor_reverse_simple(int pwmVal)
+void Motor_reverse_simple(int pwmValL, int pwmValR)
 {
  // Motor A: PWM on CH3, CH4 = 0
  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
- __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, pwmVal);
+ __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, pwmValL);
 
  // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
- __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmVal);
+ __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmValR);
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 
- sprintf(buf, "PWM = %4dF ", pwmVal);
+ sprintf(buf, "PWM L = %4dR = %4d ", pwmValL, pwmValR);
  OLED_ShowString(0, 10, buf);
 }
 
@@ -1011,7 +1017,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     //457_ for 57 cm, left, so 80.31
 
   }
-  Motor_reverse_simple(1000);
+  Motor_reverse_simple(1000, 1000);
   HAL_Delay(50);
   Motor_stop();
 }
@@ -1037,8 +1043,6 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
 
     if (pwm < pwmMin) pwm = pwmMin;
 
-    //Motor_reverse(pwm);
-    //Motor_reverse_simple(pwm);
     Motor_reverse_advanced(pwm);
 
     // Display progress
@@ -1047,7 +1051,7 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     OLED_Refresh_Gram();
 
   }
-  Motor_forward_simple(1000);
+  Motor_forward_simple(1000, 1000);
   HAL_Delay(50);
   Motor_stop();
 }
@@ -1258,10 +1262,36 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
             current_pwm = (int)(pwmVal * 0.6f);
         }
 
-        if (current_pwm < pwmMin) current_pwm = pwmMin;
-        if (current_pwm > pwmMax) current_pwm = pwmMax;
+        // --- Ackermann differential: slow the inner wheel ---
+        int pwm_left  = current_pwm;
+        int pwm_right = current_pwm;
 
-        Motor_forward_simple(current_pwm);
+        float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
+        if (steer_rad > 0.02f) {  // avoid division by zero for near-straight
+            float R_inner = WHEELBASE_CM / tanf(steer_rad);
+            float R_outer = R_inner + TRACK_WIDTH_CM;
+            float ratio   = R_inner / R_outer;  // < 1.0
+
+            int pwm_inner = (int)(current_pwm * ratio);
+            if (pwm_inner < pwmMin) pwm_inner = pwmMin;
+
+            if (steer_angle > 0) {
+                // Turning right -> right wheel is inner
+                pwm_right = pwm_inner;
+            } else {
+                // Turning left  -> left wheel is inner
+                pwm_left  = pwm_inner;
+            }
+        }
+
+        // pwm clamping
+        if (pwm_left < pwmMin) pwm_left = pwmMin;
+        if (pwm_left > pwmMax) pwm_left = pwmMax;
+        if (pwm_right < pwmMin) pwm_right = pwmMin;
+        if (pwm_right > pwmMax) pwm_right = pwmMax;
+
+
+        Motor_forward_simple(pwm_left, pwm_right);
 
         // Run non-critical slow tasks (US sensor, OLED) only every 50ms
         if (loop_tick - last_slow_tick > 50) {
@@ -1289,7 +1319,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm)
 
         HAL_Delay(5); // Faster loop frequency (200Hz)
     }
-    Motor_reverse_simple(1000);
+    Motor_reverse_simple(1000, 1000);
     HAL_Delay(50);
     Motor_stop();
     Servo_SetAngle_Safe(0, 0); // gradual return to center
@@ -1388,10 +1418,36 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
             current_pwm = (int)(pwmVal * 0.6f);
         }
 
-        if (current_pwm < pwmMin) current_pwm = pwmMin;
-        if (current_pwm > pwmMax) current_pwm = pwmMax;
+        // --- Ackermann differential: slow the inner wheel ---
+        int pwm_left  = current_pwm;
+        int pwm_right = current_pwm;
 
-        Motor_reverse_simple(current_pwm);
+        float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
+        if (steer_rad > 0.02f) {  // avoid division by zero for near-straight
+            float R_inner = WHEELBASE_CM / tanf(steer_rad);
+            float R_outer = R_inner + TRACK_WIDTH_CM;
+            float ratio   = R_inner / R_outer;  // < 1.0
+
+            int pwm_inner = (int)(current_pwm * ratio);
+            if (pwm_inner < pwmMin) pwm_inner = pwmMin;
+
+            if (steer_angle > 0) {
+                // Turning right -> right wheel is inner
+                pwm_right = pwm_inner;
+            } else {
+                // Turning left  -> left wheel is inner
+                pwm_left  = pwm_inner;
+            }
+        }
+
+        // pwm clamping
+        if (pwm_left < pwmMin) pwm_left = pwmMin;
+        if (pwm_left > pwmMax) pwm_left = pwmMax;
+        if (pwm_right < pwmMin) pwm_right = pwmMin;
+        if (pwm_right > pwmMax) pwm_right = pwmMax;
+
+
+        Motor_reverse_simple(pwm_left, pwm_right);
 
         // Run non-critical slow tasks (US sensor, OLED) only every 50ms
         if (loop_tick - last_slow_tick > 50) {
@@ -1413,7 +1469,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 
         HAL_Delay(5); // Faster loop frequency (200Hz)
     }
-    Motor_forward_simple(1000);
+    Motor_forward_simple(1000, 1000);
     HAL_Delay(50);
     Motor_stop();
     Servo_SetAngle_Safe(0, 0); // gradual return to center
@@ -1677,20 +1733,6 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-//  start = 0;
-//  angle = 0;
-//  target_angle = 1000; // rotate 1000 degree
-//  error = target_angle - angle;
-//  error_old = 0;
-//  error_area = 0;
-//
-//  // motor drive here
-//  OLED_Clear();
-//  OLED_ShowString(0, 0, "Target: ");
-//  OLED_ShowString(0, 10, "Rotated: ");
-//  OLED_ShowString(0, 30, "RPM = ");
-//  sprintf(buf, "%4d", target_angle); // Hall Sensor = 26 poles/13 pulses, DC motor = 20x13 = 260 pulse per revolution
-//  OLED_ShowString(60, 0, buf);
 
 //  OLED_ShowString(15, 40, "Press User");    // show message on OLED display at line 40)
 //  OLED_ShowString(0, 50, "button to stop"); // show message on OLED display at line 50)
@@ -1708,6 +1750,14 @@ int main(void)
   Servo_SetAngle_Safe(0,0);
   HAL_Delay(1000);
   OLED_Clear();
+
+    Turn_Car_Reverse(360.0f, 3000, 45, 0);
+      HAL_Delay(5000);
+        Turn_Car_Reverse(360.0f, 2000,  45, 0);
+          HAL_Delay(5000);
+            Turn_Car_Reverse(360.0f, 1500, 45, 0);
+
+
 
 
   

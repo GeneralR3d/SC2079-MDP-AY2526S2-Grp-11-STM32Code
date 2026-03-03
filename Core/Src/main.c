@@ -342,7 +342,7 @@ void Motor_forward_simple(int pwmValL, int pwmValR)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmValR);
 
- sprintf(buf, "PWM L=%4d R=%4d ", pwmValL, pwmValR);
+ sprintf(buf, "PWM=%4d/%4d ", pwmValL, pwmValR);
  OLED_ShowString(0, 10, buf);
 }
 
@@ -373,7 +373,7 @@ void Motor_forward_advanced(int pwmVal)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, right_cmd);
 
- sprintf(buf, "PWM L = %4dR = %4d ", left_cmd, right_cmd);
+ sprintf(buf, "PWM= %4d/%4d ", left_cmd, right_cmd);
  OLED_ShowString(0, 10, buf);
 }
 
@@ -404,7 +404,7 @@ void Motor_reverse_advanced(int pwmVal)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, right_cmd);
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 
- sprintf(buf, "PWM L = %4dR = %4d ", left_cmd, right_cmd);
+ sprintf(buf, "PWM= %4d/%4d ", left_cmd, right_cmd);
  OLED_ShowString(0, 10, buf);
 }
 
@@ -419,7 +419,7 @@ void Motor_reverse_simple(int pwmValL, int pwmValR)
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmValR);
  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
 
- sprintf(buf, "PWM L = %4dR = %4d ", pwmValL, pwmValR);
+ sprintf(buf, "PWM= %4d/%4d ", pwmValL, pwmValR);
  OLED_ShowString(0, 10, buf);
 }
 
@@ -1751,15 +1751,6 @@ int main(void)
   HAL_Delay(1000);
   OLED_Clear();
 
-    Turn_Car(360.0f, 3000, -45, 0);
-
-  // for(int i = 1050; i>= 900; i--){
-  //   _Servo_WriteUS(i);
-  //   sprintf(buf, "PWM: %d", i);
-  //   OLED_ShowString(0, 0, (uint8_t *)buf);
-  //   OLED_Refresh_Gram();
-  //   HAL_Delay(10000);
-  // }
 
 
 

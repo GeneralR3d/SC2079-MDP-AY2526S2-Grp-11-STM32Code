@@ -726,40 +726,64 @@ static uint16_t adc_read_channel(ADC_HandleTypeDef *hadc, uint32_t channel)
 
 static inline float dist_cm_from_mv_6(uint32_t mv)
 {
-  if (mv == 0) return 80.0f; // avoid division by zero
-  
-  // Power law regression Y = A * X^B where Y = MV, X = CM
-  // A = 1.088e+04, B = -7.387e-01
-  // Therefore, CM = pow((MV / A), (1 / B))
-  const float A = 1.048e4f;
-  const float B = -0.7209f;
-  float d = powf((float)mv / A, 1.0f / B);
-  
-  // optional clamping to expected range
-  if (d < 4.0f)
-    d = 4.0f;
-  if (d > 80.0f)
-    d = 80.0f;
-  return d;
+    /* Calibration table — mv sorted descending (close→far) */
+    static const uint32_t mv_lut[] = {3080, 2453, 1295, 840, 630, 510, 435, 337};
+    static const float    cm_lut[] = { 5.0f, 10.0f, 20.0f, 30.0f,
+                                       40.0f, 50.0f, 60.0f, 70.0f};
+    const int N = 8;
+
+    /* Clamp out-of-range inputs */
+    if (mv >= mv_lut[0])       return cm_lut[0];
+    if (mv <= mv_lut[N - 1])   return cm_lut[N - 1];
+
+    /* Find the segment [mv_lut[i], mv_lut[i+1]] that contains mv */
+    for (int i = 0; i < N - 1; i++) {
+        if (mv >= mv_lut[i + 1]) {
+            /* t = 0 at mv_lut[i] (cm_lut[i]), t = 1 at mv_lut[i+1] (cm_lut[i+1]) */
+            float t = (float)(mv_lut[i] - mv) /
+                      (float)(mv_lut[i] - mv_lut[i + 1]);
+            return cm_lut[i] + t * (cm_lut[i + 1] - cm_lut[i]);
+        }
+    }
+    return cm_lut[N - 1]; /* unreachable, satisfies compiler */
 }
 
+
+/* *
+ * Uses piecewise linear interpolation over 8 measured (mv, cm) pairs.
+ * This is more accurate than a single analytical formula because the
+ * sensor response has near-field and far-field roll-off that no simple
+ * curve fits well across the full 5–70 cm range.
+ *
+ * Calibration data (measured):
+ *   mv : 3079  2515  1280  800  610  510  415  220
+ *   cm :    5    10    20   30   40   50   60   70
+ *
+ * For any mv strictly between two table entries the output is linearly
+ * interpolated.  Inputs outside [220, 3079] mV are clamped to [5, 70] cm.
+ */
 static inline float dist_cm_from_mv_7(uint32_t mv)
 {
-  if (mv == 0) return 80.0f; // avoid division by zero
-  
-  // Power law regression Y = A * X^B where Y = MV, X = CM
-  // A = 1.088e+04, B = -7.387e-01
-  // Therefore, CM = pow((MV / A), (1 / B))
-  const float A = 1.088e4f;
-  const float B = -0.7387f;
-  float d = powf((float)mv / A, 1.0f / B);
-  
-  // optional clamping to expected range
-  if (d < 4.0f)
-    d = 4.0f;
-  if (d > 80.0f)
-    d = 80.0f;
-  return d;
+    /* Calibration table — mv sorted descending (close→far) */
+    static const uint32_t mv_lut[] = {3079, 2515, 1280, 800, 610, 510, 415, 220};
+    static const float    cm_lut[] = { 5.0f, 10.0f, 20.0f, 30.0f,
+                                       40.0f, 50.0f, 60.0f, 70.0f};
+    const int N = 8;
+
+    /* Clamp out-of-range inputs */
+    if (mv >= mv_lut[0])       return cm_lut[0];
+    if (mv <= mv_lut[N - 1])   return cm_lut[N - 1];
+
+    /* Find the segment [mv_lut[i], mv_lut[i+1]] that contains mv */
+    for (int i = 0; i < N - 1; i++) {
+        if (mv >= mv_lut[i + 1]) {
+            /* t = 0 at mv_lut[i] (cm_lut[i]), t = 1 at mv_lut[i+1] (cm_lut[i+1]) */
+            float t = (float)(mv_lut[i] - mv) /
+                      (float)(mv_lut[i] - mv_lut[i + 1]);
+            return cm_lut[i] + t * (cm_lut[i + 1] - cm_lut[i]);
+        }
+    }
+    return cm_lut[N - 1]; /* unreachable, satisfies compiler */
 }
 
 // IMU configuration

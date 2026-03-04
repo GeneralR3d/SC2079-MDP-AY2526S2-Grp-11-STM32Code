@@ -131,6 +131,7 @@ void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
+void task_two();
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
@@ -213,7 +214,7 @@ void process_command(char *cmd) {
 
     send_message_over(cmd);
 
-    if (parsed_csv >= 3 && (type == 'f' || type == 'b' || type == 'l' || type == 'r')) {
+    if (parsed_csv >= 1 && (type == 'f' || type == 'b' || type == 'l' || type == 'r' || type == 't')) {
         if (type == 'f' && parsed_csv >= 3) {
 
             float pwm_f = p1;
@@ -263,7 +264,11 @@ void process_command(char *cmd) {
 
             send_message_over("ACK\n");
             return;
-    }
+    	} else if (type == 't' && parsed_csv == 1) {
+			task_two();
+			send_message_over("ACK\n");
+			return;
+		}
         // If we got here, CSV header was recognised but arguments were bad
         char err[64];
         snprintf(err, sizeof(err), "ERR: bad CSV cmd %s\r\n", cmd);
@@ -1620,6 +1625,8 @@ void Measure_Motor_Speed_forward(int pwmVal)
         }
     }
 }
+
+void task_two() {}
 
 /* USER CODE END 0 */
 

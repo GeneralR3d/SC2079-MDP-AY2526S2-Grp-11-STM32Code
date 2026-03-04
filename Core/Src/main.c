@@ -132,6 +132,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two();
+char task_two_uart();
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
@@ -266,7 +267,6 @@ void process_command(char *cmd) {
             return;
     	} else if (type == 't' && parsed_csv == 1) {
 			task_two();
-			send_message_over("ACK\n");
 			return;
 		}
         // If we got here, CSV header was recognised but arguments were bad
@@ -1627,11 +1627,11 @@ void Measure_Motor_Speed_forward(int pwmVal)
 }
 
 void task_two() {
+	send_message_over("ACK\n");
 	speed = 3000;
 	obstacle_clearance_distance = 50; //need to calibrate actual distance
 
 	reset_encoders();
-	float dist_start = cm_travelled_forward();
 
 	while (1) {
 		if (HCSR04_Read() <= obstacle_clearance_distance) {
@@ -1646,31 +1646,44 @@ void task_two() {
     	}
 		Motor_forward_advanced(speed); 
 	}
-	float dist_travelled = cm_travelled_forward(); //order of this line may be incorrect need to double check
+	float dist_now = cm_travelled_forward();
+	float dist_travelled = dist_now;
 
+	char direction = task_two_uart();
+	//continue
+}
+
+char task_two_uart() {
 	send_message_over("picture"); //tell rpi to handle this
 	while (1) {
 		uint8_t ch;
+		int cmd_i = 0;
+		char cmd[64];
 		if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
 			
 			if (ch == '\n' || ch == '\r') {
-				if (cmd_index > 0) {
-					cmd_buf[cmd_index] = '\0';
+				if (cmd_i > 0) {
+					cmd[cmd_i] = '\0';
 					
 					//receive command
 					char type;
-					sscanf(cmd_buf, "%c", &type);    
+					sscanf(cmd, "%c", &type);    
 					send_message_over(cmd);
-					cmd_index = 0;
+					if (type == 'r' || type == 'l' && parsed_csv == 1) {
+						send_message_over("ACK\n");
+						return type;
+					} else {
+						send_message_over("error");
+						send_message_over("ACK\n");
+					cmd_i = 0;
 				}
 			} else {
-			  if (cmd_index < CMD_BUF_LEN - 1) {
-				  cmd_buf[cmd_index++] = ch;
+			  if (cmd < CMD_BUF_LEN - 1) {
+				  cmd[cmd_i++] = ch;
 	          }
 			}
 		}
 	}
-	
 }
 
 /* USER CODE END 0 */

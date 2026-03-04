@@ -1626,7 +1626,52 @@ void Measure_Motor_Speed_forward(int pwmVal)
     }
 }
 
-void task_two() {}
+void task_two() {
+	speed = 3000;
+	obstacle_clearance_distance = 50; //need to calibrate actual distance
+
+	reset_encoders();
+	float dist_start = cm_travelled_forward();
+
+	while (1) {
+		if (HCSR04_Read() <= obstacle_clearance_distance) {
+			Motor_reverse_simple(1000, 1000);
+			HAL_Delay(50);
+      		Motor_stop();
+      		OLED_ShowString(0, 30, "Obstacle detected!");
+      		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
+      		HAL_Delay(1000);
+      		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
+      		break;
+    	}
+		Motor_forward_advanced(speed); 
+	}
+	float dist_travelled = cm_travelled_forward(); //order of this line may be incorrect need to double check
+
+	send_message_over("picture"); //tell rpi to handle this
+	while (1) {
+		uint8_t ch;
+		if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+			
+			if (ch == '\n' || ch == '\r') {
+				if (cmd_index > 0) {
+					cmd_buf[cmd_index] = '\0';
+					
+					//receive command
+					char type;
+					sscanf(cmd_buf, "%c", &type);    
+					send_message_over(cmd);
+					cmd_index = 0;
+				}
+			} else {
+			  if (cmd_index < CMD_BUF_LEN - 1) {
+				  cmd_buf[cmd_index++] = ch;
+	          }
+			}
+		}
+	}
+	
+}
 
 /* USER CODE END 0 */
 

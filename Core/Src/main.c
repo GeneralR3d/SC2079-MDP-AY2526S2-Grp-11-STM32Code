@@ -1003,13 +1003,10 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     //snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
     //OLED_ShowString(0, 10, (uint8_t*)buf);
     // // show left encoder ticks for debugging
-    int32_t l = left_ticks_forward();
-    snprintf(buf, sizeof(buf), "Left:%ld", (long)l);
-    OLED_ShowString(0, 20, (uint8_t*)buf);
-
-    int32_t r = right_ticks_forward();
-    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    OLED_ShowString(0, 30, (uint8_t*)buf);
+    // int32_t l = left_ticks_forward();
+    // int32_t r = right_ticks_forward();
+    // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    // OLED_ShowString(0, 20, (uint8_t*)buf);
 
     OLED_Refresh_Gram();
 

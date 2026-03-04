@@ -238,6 +238,11 @@ void process_command(char *cmd) {
             int pwm = (int)p2;
             float arc_cm = p3;
 
+            char msg[64];
+            snprintf(msg, sizeof(msg), "LEFT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            HAL_Delay(20000);
+
 			if (arc_cm >= 0) {
 				cmd_turn_left(deg, pwm, arc_cm);
 			} else {
@@ -253,6 +258,11 @@ void process_command(char *cmd) {
             float deg = p1;
             int pwm = (int)p2;
             float arc_cm = p3;
+
+            char msg[64];
+            snprintf(msg, sizeof(msg), "RIGHT %.1f deg %.1f cm @ %d\r\n", deg, arc_cm, pwm);
+            HAL_UART_Transmit(&huart3, (uint8_t*)msg, strlen(msg), HAL_MAX_DELAY);
+            HAL_Delay(20000);
 
             if (arc_cm >= 0) {
 				cmd_turn_right(deg, pwm, arc_cm);

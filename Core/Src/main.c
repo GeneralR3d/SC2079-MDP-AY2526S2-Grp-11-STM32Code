@@ -267,7 +267,7 @@ void process_command(char *cmd) {
 
             send_message_over("ACK\n");
             return;
-    	} else if (type == 't' && parsed_csv == 1) {
+    	} else if (type == 's' && parsed_csv == 1) {
 			task_two();
 			return;
 		}
@@ -1682,7 +1682,7 @@ char task_two_uart() {
 	char cmd[64];
 
 	while (1) {
-		send_message_over("picture"); //tell rpi to handle this
+		send_message_over("snap\n"); //tell rpi to handle this
 		uint8_t ch;
 
 		if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
@@ -1695,12 +1695,12 @@ char task_two_uart() {
 					char type;
 					sscanf(cmd, "%c", &type);    
 					send_message_over(cmd);
-					if (type == 'r' || type == 'l' && parsed_csv == 1) {
+					if (type == '>' || type == '<' && parsed_csv == 1) {
 						send_message_over("ACK\n");
 						return type;
 					} else {
-						send_message_over("error");
-						send_message_over("ACK\n");
+						send_message_over("error\n");
+            send_message_over("ACK\n");
 						cmd_i = 0;
 					}
 				}

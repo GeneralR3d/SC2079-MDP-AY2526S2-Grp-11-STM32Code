@@ -268,6 +268,8 @@ void process_command(char *cmd) {
       return;
     } else if (type == 's' && parsed_csv == 1) {
       task_two();
+      send_message_over("e\n");
+      send_message_over("ACK\n");
       return;
     }
     // If we got here, CSV header was recognised but arguments were bad

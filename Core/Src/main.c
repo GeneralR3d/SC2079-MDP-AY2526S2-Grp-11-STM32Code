@@ -134,6 +134,7 @@ uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two();
 char task_two_uart();
 float task_two_forward_to_obstacle(int speed, float obstacle_clearance_distance);
+float task_two_forward_ir(int speed, char direction);
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
@@ -1729,6 +1730,35 @@ float task_two_forward_to_obstacle(int speed, float obstacle_clearance_distance)
     	}
 		Motor_forward_advanced(speed); 
 	}
+}
+
+float task_two_forward_ir(int speed, char direction) {
+	reset_encoders();
+
+    while (1) {
+		if (direction == 'l') {
+			// IR6 PA6 = ADC1_IN6 (right sensor)
+			// raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
+   //  		mv6  = (uint32_t)raw6 * 3300u / 4095u;
+   //      	dist6 = dist_cm_from_mv_6(mv6);
+
+			// sprintf(buf, "%.2f", dist6);
+
+		} else if (direction == 'r') {
+			// IR7 PA7 = ADC1_IN7 (left sensor)
+			// raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
+   //      	mv7  = (uint32_t)raw7 * 3300u / 4095u;
+   //      	dist7 = dist_cm_from_mv_7(mv7);
+
+			// sprintf(buf, "%.2f", dist7);
+		}
+		
+		// OLED_ShowString(0, 20, (uint8_t*)buf);
+  //       OLED_Refresh_Gram();
+  //       HAL_Delay(100);
+		
+		Motor_forward_advanced(speed); 
+    }
 }
 
 /* USER CODE END 0 */

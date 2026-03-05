@@ -1683,7 +1683,7 @@ void task_two() {
   // turn according to picture (arrow)
   if (direction == '<') {
     cmd_turn_left(90, 3000,
-                  40); // values might be wrong calibrate everything below
+                  40); // values may be wrong calibrate everything below
     Drive_Forward_ToCM(5, 3000);
     cmd_turn_right(90, 3000, 40);
     Drive_Forward_ToCM(10, 3000);
@@ -1692,7 +1692,7 @@ void task_two() {
     cmd_turn_left(90, 3000, 40);
   } else if (direction == '>') {
     cmd_turn_right(90, 3000,
-                   40); // values might be wrong calibrate everything below
+                   40); // values may be wrong calibrate everything below
     Drive_Forward_ToCM(5, 3000);
     cmd_turn_left(90, 3000, 40);
     Drive_Forward_ToCM(10, 3000);
@@ -1711,15 +1711,36 @@ void task_two() {
   // turn according to picture (arrow)
   if (direction == '<') {
     cmd_turn_left(90, 3000,
-                  40); // values might be wrong calibrate everything below
-    // drive forward until ir sensor
+                  40); // values may be wrong calibrate everything below
+    float half_horizontal_dist = task_two_forward_ir(speed, direction);
+    cmd_turn_right(90, 3000, 40);
+    float vertical_dist = task_two_forward_ir(speed, direction);
+    cmd_turn_right(90, 3000, 40);
+    Drive_Forward_ToCM(half_horizontal_dist*2, speed); // may be completely off
+    cmd_turn_right(90, 3000, 40);
+    
+    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, int base_pwm); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
+    cmd_turn_right(90, 3000, 40);
+    Drive_Forward_ToCM(half_horizontal_dist, speed);
+    cmd_turn_left(90, 3000, 40);
+
   } else if (direction == '>') {
     cmd_turn_right(90, 3000,
-                   40); // values might be wrong calibrate everything below
-    // drive forward until ir sensor
+                   40); // values may be wrong calibrate everything below
+    float half_horizontal_dist = task_two_forward_ir(speed, direction);
+    cmd_turn_left(90, 3000, 40);
+    float vertical_dist = task_two_forward_ir(speed, direction);
+    cmd_turn_left(90, 3000, 40);
+    Drive_Forward_ToCM(half_horizontal_dist*2, speed); // may be completely off
+    cmd_turn_left(90, 3000, 40);
+
+    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, int base_pwm); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
+    cmd_turn_left(90, 3000, 40);
+    Drive_Forward_ToCM(half_horizontal_dist, speed);
+    cmd_turn_right(90, 3000, 40);
+
   }
 
-  // continue
 }
 
 char task_two_uart() {
@@ -1736,7 +1757,6 @@ char task_two_uart() {
         if (cmd_i > 0) {
           cmd[cmd_i] = '\0';
 
-          // receive command
           char type;
           sscanf(cmd, "%c", &type);
           send_message_over(cmd);
@@ -1784,28 +1804,47 @@ float task_two_forward_ir(int speed, char direction) {
   while (1) {
     if (direction == '<') {
       // IR6 PA6 = ADC1_IN6 (right sensor)
-      // raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
-      //  		mv6  = (uint32_t)raw6 * 3300u / 4095u;
-      //      	dist6 = dist_cm_from_mv_6(mv6);
+      raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
+      mv6 = (uint32_t)raw6 * 3300u / 4095u;
+      dist6 = dist_cm_from_mv_6(mv6);
 
-      // sprintf(buf, "%.2f", dist6);
+      if (dist6 >= 50) {
+        Motor_reverse_simple(1000, 1000);
+        HAL_Delay(50);
+        Motor_stop();
+        return cm_travelled_forward(); // may need to change if reset encoders
+                                       // does not reset ticks
+      }
+
+      sprintf(buf, "%.2f", dist6);
 
     } else if (direction == '>') {
       // IR7 PA7 = ADC1_IN7 (left sensor)
-      // raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
-      //      	mv7  = (uint32_t)raw7 * 3300u / 4095u;
-      //      	dist7 = dist_cm_from_mv_7(mv7);
+      raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
+      mv7 = (uint32_t)raw7 * 3300u / 4095u;
+      dist7 = dist_cm_from_mv_7(mv7);
 
-      // sprintf(buf, "%.2f", dist7);
+      if (dist7 >= 50) {
+        Motor_reverse_simple(1000, 1000);
+        HAL_Delay(50);
+        Motor_stop();
+        return cm_travelled_forward(); // may need to change if reset encoders
+                                       // does not reset ticks
+      }
+
+      sprintf(buf, "%.2f", dist7);
+
     }
 
-    // OLED_ShowString(0, 20, (uint8_t*)buf);
-    //       OLED_Refresh_Gram();
-    //       HAL_Delay(100);
-
-    Motor_forward_advanced(speed);
   }
+
+  OLED_ShowString(0, 20, (uint8_t *)buf);
+  OLED_Refresh_Gram();
+  HAL_Delay(100);
+
+  Motor_forward_advanced(speed);
 }
+
 
 /* USER CODE END 0 */
 

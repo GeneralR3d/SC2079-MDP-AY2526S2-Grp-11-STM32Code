@@ -1641,16 +1641,16 @@ void task_two() {
 
 	//turn according to picture (arrow)
 	if (direction == 'l') {
-		cmd_turn_left(90, 3000, 40); //values might be wrong
-		Drive_Forward_ToCM(5, 3000); //calibrate everything below
+		cmd_turn_left(90, 3000, 40); //values might be wrong calibrate everything below
+		Drive_Forward_ToCM(5, 3000);
 		cmd_turn_right(90, 3000, 40);
 		Drive_Forward_ToCM(10, 3000);
 		cmd_turn_right(90, 3000, 40);
 		Drive_Forward_ToCM(5, 3000);
 		cmd_turn_left(90, 3000, 40);
 	} else if (direction == 'r') {
-		cmd_turn_right(90, 3000, 40); //values might be wrong
-		Drive_Forward_ToCM(5, 3000); //calibrate everything below
+		cmd_turn_right(90, 3000, 40); //values might be wrong calibrate everything below
+		Drive_Forward_ToCM(5, 3000);
 		cmd_turn_left(90, 3000, 40);
 		Drive_Forward_ToCM(10, 3000);
 		cmd_turn_left(90, 3000, 40);
@@ -1658,6 +1658,20 @@ void task_two() {
 		cmd_turn_right(90, 3000, 40);
 	}
 
+	float second_dist_travelled = task_two_forward_to_obstacle(speed, obstacle_clearance_distance) +  obstacle_clearance_actual_distance;
+
+	//listen to rpi for 2nd obstacle
+	direction = task_two_uart();
+
+	//turn according to picture (arrow)
+	if (direction == 'l') {
+		cmd_turn_left(90, 3000, 40); //values might be wrong calibrate everything below
+		// drive forward until ir sensor
+	} else if (direction == 'r') {
+		cmd_turn_right(90, 3000, 40); //values might be wrong calibrate everything below
+		// drive forward until ir sensor
+	}
+	
 	//continue
 	
 }

@@ -1630,16 +1630,18 @@ void task_two() {
 	send_message_over("ACK\n");
 	speed = 3000;
 	obstacle_clearance_distance = 50; //need to calibrate actual distance
+	obstacle_clearance_actual_distance = 0; //calculate actual distance between ultrasonic and obstacle
 
 	reset_encoders();
 
+	//drive to 1st obstacle
 	while (1) {
 		if (HCSR04_Read() <= obstacle_clearance_distance) {
 			Motor_reverse_simple(1000, 1000);
 			HAL_Delay(50);
       		Motor_stop();
 			float dist_now = cm_travelled_forward();
-			float dist_travelled = dist_now;
+			float first_dist_travelled = dist_now + obstacle_clearance_actual_distance;
       		OLED_ShowString(0, 30, "Obstacle detected!");
       		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
       		HAL_Delay(1000);
@@ -1649,8 +1651,30 @@ void task_two() {
 		Motor_forward_advanced(speed); 
 	}
 
+	//listen to rpi for 1st obstacle
 	char direction = task_two_uart();
+
+	//turn according to picture (arrow)
+	if (direction == 'l') {
+		cmd_turn_left(90, 3000, 40); //values might be wrong
+		Drive_Forward_ToCM(5, 3000); //calibrate everything below
+		cmd_turn_right(90, 3000, 40);
+		Drive_Forward_ToCM(10, 3000);
+		cmd_turn_right(90, 3000, 40);
+		Drive_Forward_ToCM(5, 3000);
+		cmd_turn_left(90, 3000, 40);
+	} else if (direction == 'r') {
+		cmd_turn_right(90, 3000, 40); //values might be wrong
+		Drive_Forward_ToCM(5, 3000); //calibrate everything below
+		cmd_turn_left(90, 3000, 40);
+		Drive_Forward_ToCM(10, 3000);
+		cmd_turn_left(90, 3000, 40);
+		Drive_Forward_ToCM(5, 3000);
+		cmd_turn_right(90, 3000, 40);
+	}
+
 	//continue
+	
 }
 
 char task_two_uart() {

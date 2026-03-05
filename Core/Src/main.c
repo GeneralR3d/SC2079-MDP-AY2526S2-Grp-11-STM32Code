@@ -133,6 +133,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two();
 char task_two_uart();
+float task_two_forward_to_obstacle(int speed, float obstacle_clearance_distance);
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
@@ -1628,28 +1629,12 @@ void Measure_Motor_Speed_forward(int pwmVal)
 
 void task_two() {
 	send_message_over("ACK\n");
-	speed = 3000;
-	obstacle_clearance_distance = 50; //need to calibrate actual distance
-	obstacle_clearance_actual_distance = 0; //calculate actual distance between ultrasonic and obstacle
-
-	reset_encoders();
+	int speed = 3000;
+	float obstacle_clearance_distance = 50; //need to calibrate actual distance
+	float obstacle_clearance_actual_distance = 0; //calculate actual distance between ultrasonic and obstacle
 
 	//drive to 1st obstacle
-	while (1) {
-		if (HCSR04_Read() <= obstacle_clearance_distance) {
-			Motor_reverse_simple(1000, 1000);
-			HAL_Delay(50);
-      		Motor_stop();
-			float dist_now = cm_travelled_forward();
-			float first_dist_travelled = dist_now + obstacle_clearance_actual_distance;
-      		OLED_ShowString(0, 30, "Obstacle detected!");
-      		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-      		HAL_Delay(1000);
-      		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-      		break;
-    	}
-		Motor_forward_advanced(speed); 
-	}
+	float first_dist_travelled = task_two_forward_to_obstacle(speed, obstacle_clearance_distance) +  obstacle_clearance_actual_distance;
 
 	//listen to rpi for 1st obstacle
 	char direction = task_two_uart();
@@ -1702,13 +1687,33 @@ char task_two_uart() {
 						send_message_over("error");
 						send_message_over("ACK\n");
 						cmd_i = 0;
+					}
 				}
 			} else {
-			  if (cmd < CMD_BUF_LEN - 1) {
+				if (cmd < CMD_BUF_LEN - 1) {
 				  cmd[cmd_i++] = ch;
-	          }
+				}
 			}
 		}
+	}
+}
+
+float task_two_forward_to_obstacle(int speed, float obstacle_clearance_distance) {
+	reset_encoders();
+
+	while (1) {
+		if (HCSR04_Read() <= obstacle_clearance_distance) {
+			Motor_reverse_simple(1000, 1000);
+			HAL_Delay(50);
+      		Motor_stop();
+			float dist_now = cm_travelled_forward();
+      		OLED_ShowString(0, 30, "Obstacle detected!");
+      		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
+      		HAL_Delay(1000);
+      		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
+      		return dist_now;
+    	}
+		Motor_forward_advanced(speed); 
 	}
 }
 

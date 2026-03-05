@@ -1638,6 +1638,8 @@ void task_two() {
 			Motor_reverse_simple(1000, 1000);
 			HAL_Delay(50);
       		Motor_stop();
+			float dist_now = cm_travelled_forward();
+			float dist_travelled = dist_now;
       		OLED_ShowString(0, 30, "Obstacle detected!");
       		HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
       		HAL_Delay(1000);
@@ -1646,19 +1648,19 @@ void task_two() {
     	}
 		Motor_forward_advanced(speed); 
 	}
-	float dist_now = cm_travelled_forward();
-	float dist_travelled = dist_now;
 
 	char direction = task_two_uart();
 	//continue
 }
 
 char task_two_uart() {
-	send_message_over("picture"); //tell rpi to handle this
+	int cmd_i = 0;
+	char cmd[64];
+
 	while (1) {
+		send_message_over("picture"); //tell rpi to handle this
 		uint8_t ch;
-		int cmd_i = 0;
-		char cmd[64];
+
 		if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
 			
 			if (ch == '\n' || ch == '\r') {
@@ -1675,7 +1677,7 @@ char task_two_uart() {
 					} else {
 						send_message_over("error");
 						send_message_over("ACK\n");
-					cmd_i = 0;
+						cmd_i = 0;
 				}
 			} else {
 			  if (cmd < CMD_BUF_LEN - 1) {

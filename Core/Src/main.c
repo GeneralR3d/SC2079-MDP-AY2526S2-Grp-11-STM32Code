@@ -46,6 +46,8 @@ float TURN_RADIUS = 24.75f; // min turning radius (cm) when steering is 45°
 #define WHEELBASE_CM    14.5f   // distance from front axle to rear axle
 #define TRACK_WIDTH_CM  16.2f   // distance between the two rear wheels
 
+// TASK 1 
+#define TASK1_PWM 3000
 
 
 float yaw_angle = 0;   // global or static variable
@@ -124,10 +126,10 @@ static inline int32_t right_ticks_reverse(void);
 
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
-void cmd_turn_left(float target_deg, int pwmVal, float target_cm);
-void cmd_turn_right(float target_deg, int pwmVal, float target_cm);
-void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm);
-void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm);
+void cmd_turn_left(float target_cm);
+void cmd_turn_right(float target_cm);
+void cmd_turn_left_reverse(float target_cm);
+void cmd_turn_right_reverse(float target_cm);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
@@ -198,67 +200,59 @@ void send_message_over(const char *input) {
 
 void process_command(char *cmd) {
     // First, try simple CSV-style motion commands:
-    //  f,<pwm>,<cm>
-    //  b,<pwm>,<cm>
-    //  l,<deg>,<pwm>,<cm>
-    //  r,<deg>,<pwm>,<cm>
+    //  f,<cm>
+    //  b,<cm>
+    //  l,<cm>
+    //  r,<cm>
     //
     // Examples:
-    //  "f,3000,100"     -> forward 100 cm at PWM 3000
-    //  "b,3000,100"     -> reverse 100 cm at PWM 3000
-    //  "l,90.0,3000,50" -> left  90° at PWM 3000 with 50 cm arc
-    //  "r,180.0,3000,50"-> right 180° at PWM 3000 with 50 cm arc
+    //  "f,100"     -> forward 100 cm at PWM 3000 (FIXED PWM)
+    //  "b,100"     -> reverse 100 cm at PWM 3000 (FIXED PWM)
+    //  "l,50" -> left at PWM 3000 with 50 cm arc (FIXED PWM)
+    //  "r,50"-> right at PWM 3000 with 50 cm arc (FIXED PWM)
     char type;
-    float p1, p2, p3;
-    int parsed_csv = sscanf(cmd, "%c,%f,%f,%f", &type, &p1, &p2, &p3);    
+    float p1;
+    int parsed_csv = sscanf(cmd, "%c,%f", &type, &p1);    
 
     send_message_over(cmd);
 
     if (parsed_csv >= 1 && (type == 'f' || type == 'b' || type == 'l' || type == 'r' || type == 't')) {
-        if (type == 'f' && parsed_csv >= 3) {
+        if (type == 'f' && parsed_csv >= 2) {
 
-            float pwm_f = p1;
-            float dist_cm = p2;
-            Drive_Forward_ToCM(dist_cm, (int)pwm_f);
-
-            send_message_over("ACK\n");
-            return;
-        } else if (type == 'b' && parsed_csv >= 3) {
-
-            float pwm_b = p1;
-            float dist_cm = p2;
-            Drive_Reverse_ToCM(dist_cm, (int)pwm_b);
+            float dist_cm = p1;
+            Drive_Forward_ToCM(dist_cm, TASK1_PWM);
 
             send_message_over("ACK\n");
             return;
-        } else if (type == 'l' && parsed_csv >= 4) {
+        } else if (type == 'b' && parsed_csv >= 2) {
 
+            float dist_cm = p1;
+            Drive_Reverse_ToCM(dist_cm, TASK1_PWM);
 
-            float deg = p1;
-            int pwm = (int)p2;
-            float arc_cm = p3;
+            send_message_over("ACK\n");
+            return;
+        } else if (type == 'l' && parsed_csv >= 2) {
+
+            float arc_cm = p1;
 
 			if (arc_cm >= 0) {
-				cmd_turn_left(deg, pwm, arc_cm);
+				cmd_turn_left(arc_cm);
 			} else {
 				arc_cm = -arc_cm;
-				cmd_turn_left_reverse(deg, pwm, arc_cm);
+				cmd_turn_left_reverse(arc_cm);
 			}
 
             send_message_over("ACK\n");
             return;
-        } else if (type == 'r' && parsed_csv >= 4) {
+        } else if (type == 'r' && parsed_csv >= 2) {
 
-
-            float deg = p1;
-            int pwm = (int)p2;
-            float arc_cm = p3;
+            float arc_cm = p1;
 
             if (arc_cm >= 0) {
-				cmd_turn_right(deg, pwm, arc_cm);
+				cmd_turn_right(arc_cm);
 			} else {
 				arc_cm = -arc_cm;
-				cmd_turn_right_reverse(deg, pwm, arc_cm);
+				cmd_turn_right_reverse(arc_cm);
 			}
 
 
@@ -1491,36 +1485,36 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle, float targe
 }
 
 
-void cmd_turn_left(float target_deg, int pwmVal, float target_cm)
+void cmd_turn_left(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    Turn_Car(target_deg, pwmVal, -45,0);
+    Turn_Car(target_deg, TASK1_PWM, -45,0);
 }
 
-void cmd_turn_left_reverse(float target_deg, int pwmVal, float target_cm)
+void cmd_turn_left_reverse(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, pwmVal, -45, 0);
+    Turn_Car_Reverse(target_deg, TASK1_PWM, -45, 0);
 }
 
-void cmd_turn_right(float target_deg, int pwmVal, float target_cm)
+void cmd_turn_right(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    Turn_Car(target_deg, pwmVal, 45, 0);
+    Turn_Car(target_deg, TASK1_PWM, 45, 0);
 }
 
-void cmd_turn_right_reverse(float target_deg, int pwmVal, float target_cm)
+void cmd_turn_right_reverse(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, pwmVal, 45, 0);
+    Turn_Car_Reverse(target_deg, TASK1_PWM, 45, 0);
 }
 
 

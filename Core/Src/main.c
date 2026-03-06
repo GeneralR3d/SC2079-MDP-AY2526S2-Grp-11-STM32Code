@@ -61,6 +61,16 @@ float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
 char cmd_buf[CMD_BUF_LEN];
 int cmd_index = 0;
 
+// Command queue structures for batching execution
+typedef struct {
+    char type;
+    float value;
+} Command;
+
+#define MAX_COMMANDS 100
+Command cmd_array[MAX_COMMANDS];
+int cmd_count = 0;
+
 // IR global variables
 volatile uint16_t raw6, raw7;
 volatile uint32_t mv6, mv7;
@@ -139,6 +149,8 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
+void store_command(char *cmd);
+void process_commands(void);
 void task_two();
 char task_two_uart();
 float task_two_forward_to_obstacle(int speed,
@@ -204,85 +216,70 @@ void send_message_over(const char *input) {
   HAL_UART_Transmit(&huart3, (uint8_t *)msg, strlen(msg), HAL_MAX_DELAY);
 }
 
-void process_command(char *cmd) {
-    // First, try simple CSV-style motion commands:
-    //  f,<cm>
-    //  b,<cm>
-    //  l,<cm>
-    //  r,<cm>
-    //
-    // Examples:
-    //  "f,100"     -> forward 100 cm at PWM 3000 (FIXED PWM)
-    //  "b,100"     -> reverse 100 cm at PWM 3000 (FIXED PWM)
-    //  "l,50" -> left at PWM 3000 with 50 cm arc (FIXED PWM)
-    //  "r,50"-> right at PWM 3000 with 50 cm arc (FIXED PWM)
-    char type;
-    float p1;
-    int parsed_csv = sscanf(cmd, "%c,%f", &type, &p1);    
-
-  send_message_over(cmd);
-
-    if (parsed_csv >= 1 && (type == 'f' || type == 'b' || type == 'l' || type == 'r' || type == 't')) {
-        if (type == 'f' && parsed_csv >= 2) {
-
-            float dist_cm = p1;
-            Drive_Forward_ToCM(dist_cm, TASK1_PWM);
-
-            send_message_over("ACK\n");
-            return;
-        } else if (type == 'b' && parsed_csv >= 2) {
-
-            float dist_cm = p1;
-            Drive_Reverse_ToCM(dist_cm, TASK1_PWM);
-
-            send_message_over("ACK\n");
-            return;
-        } else if (type == 'l' && parsed_csv >= 2) {
-
-            float arc_cm = p1;
-
-			if (arc_cm >= 0) {
-				cmd_turn_left(arc_cm);
-			} else {
-				arc_cm = -arc_cm;
-				cmd_turn_left_reverse(arc_cm);
-			}
-
-            send_message_over("ACK\n");
-            return;
-        } else if (type == 'r' && parsed_csv >= 2) {
-
-            float arc_cm = p1;
-
-            if (arc_cm >= 0) {
-				cmd_turn_right(arc_cm);
-			} else {
-				arc_cm = -arc_cm;
-				cmd_turn_right_reverse(arc_cm);
-			}
-
-
-      send_message_over("ACK\n");
-      return;
-    } else if (type == 's' && parsed_csv == 1) {
-      task_two();
-      send_message_over("e\n");
-      send_message_over("ACK\n");
-      return;
+void process_commands(void) {
+    // Run all accumulated commands in the buffer
+    for (int i = 0; i < cmd_count; i++) {
+        Command c = cmd_array[i];
+        
+        if (c.type == 'f') {
+            Drive_Forward_ToCM(c.value, TASK1_PWM);
+        } else if (c.type == 'b') {
+            Drive_Reverse_ToCM(c.value, TASK1_PWM);
+        } else if (c.type == 'l') {
+            if (c.value >= 0) {
+                cmd_turn_left(c.value);
+            } else {
+                cmd_turn_left_reverse(-c.value);
+            }
+        } else if (c.type == 'r') {
+            if (c.value >= 0) {
+                cmd_turn_right(c.value);
+            } else {
+                cmd_turn_right_reverse(-c.value);
+            }
+        } else if (c.type == 'k') {
+            // KACHAA command exactly as requested
+            Motor_stop();
+            send_message_over("SNAP\n");
+            HAL_Delay(5000); // Wait 5 sec for RPI to take photo
+        }
     }
-    // If we got here, CSV header was recognised but arguments were bad
+    
+    // Clear the command buffer after finishing all commands
+    cmd_count = 0;
+}
+
+void store_command(char *cmd) {
+    char type;
+    float p1 = 0;
+    int parsed_csv = sscanf(cmd, "%c,%f", &type, &p1);
+
+    if (parsed_csv >= 1 && (type == 'f' || type == 'b' || type == 'l' || type == 'r' || type == 'k' || type == 'K')) {
+        // Handle lower or uppercase K
+        if (type == 'K') type = 'k';
+
+        if (cmd_count < MAX_COMMANDS) {
+            cmd_array[cmd_count].type = type;
+            cmd_array[cmd_count].value = p1;
+            cmd_count++;
+            
+            // "sends ACK after each command recieved"
+            send_message_over("ACK\n");
+        } else {
+            char err[64];
+            snprintf(err, sizeof(err), "ERR: Buffer Full\r\n");
+            HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
+            // Continue sending ACK to avoid stalling the RPI
+            send_message_over("ACK\n");
+        }
+        return;
+    }
+
+    // Unknown / unsupported command
     char err[64];
-    snprintf(err, sizeof(err), "ERR: bad CSV cmd %s\r\n", cmd);
+    snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
     HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
     send_message_over("ACK\n");
-    return;
-  }
-
-  // Unknown / unsupported command
-  char err[64];
-  snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
-  HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
-  send_message_over("ACK\n");
 }
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
@@ -2015,23 +2012,38 @@ int main(void) {
   // Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   // Turn_Car(-180.0f, 2500, -40,0);
 
+  typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
+  SystemState current_state = STATE_RECEIVING;
+
   while (1) {
-    // Below section is for the RPI command unloading and execution
-    uint8_t ch;
-    if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
-
-      if (ch == '\n' || ch == '\r') {
-        if (cmd_index > 0) {
-          cmd_buf[cmd_index] = '\0';
-
-          process_command(cmd_buf);
-          cmd_index = 0;
+    if (current_state == STATE_RECEIVING) {
+        // Below section is for the RPI command unloading
+        uint8_t ch;
+        if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+            if (ch == '\n' || ch == '\r') {
+                if (cmd_index > 0) {
+                    cmd_buf[cmd_index] = '\0';
+                    
+                    // Check if RPI triggered the run
+                    if (strcmp(cmd_buf, "run") == 0) {
+                        current_state = STATE_RUNNING;
+                    } else {
+                        store_command(cmd_buf);
+                    }
+                    cmd_index = 0;
+                }
+            } else {
+                if (cmd_index < CMD_BUF_LEN - 1) {
+                    cmd_buf[cmd_index++] = ch;
+                }
+            }
         }
-      } else {
-        if (cmd_index < CMD_BUF_LEN - 1) {
-          cmd_buf[cmd_index++] = ch;
-        }
-      }
+    } else if (current_state == STATE_RUNNING) {
+        // Run mode: Execute the array
+        process_commands();
+        
+        // Return to receiving mode once all processing is finished
+        current_state = STATE_RECEIVING;
     }
   }
 

@@ -240,7 +240,7 @@ void process_commands(void) {
         } else if (c.type == 'k') {
             // KACHAA command exactly as requested
             Motor_stop();
-            send_message_over("SNAP\n");
+            send_message_over("snap\n");
             HAL_Delay(5000); // Wait 5 sec for RPI to take photo
         }
     }

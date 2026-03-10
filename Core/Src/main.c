@@ -1741,42 +1741,91 @@ void task_two() {
 
   }
 
+  // Inform RPI end of task 2
+  send_message_over("END\n");
 }
+
+
+#define SNAP_WAIT_MS 8000 // 8 seconds to retry once
 
 char task_two_uart() {
-  int cmd_i = 0;
-  char cmd[64];
 
-  while (1) {
-    send_message_over("snap\n"); // tell rpi to handle this
-    uint8_t ch;
 
-    if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+  for(int attempt = 0; attempt < 2; ++attempt) {
 
-      if (ch == '\n' || ch == '\r') {
-        if (cmd_i > 0) {
-          cmd[cmd_i] = '\0';
+      int cmd_i = 0;
+      char cmd[64];
 
-          char type;
-          sscanf(cmd, "%c", &type);
-          send_message_over(cmd);
-          if (type == '>' || type == '<') {
-            send_message_over("ACK\n");
-            return type;
+      // Send to RPI to take picture
+      send_message_over("snap\n"); 
+      uint32_t attempt_start = HAL_GetTick();
+
+      // Wait for X seconds between attempts
+      while (HAL_GetTick() - attempt_start < SNAP_WAIT_MS) {
+
+        uint8_t ch;
+        if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+
+          if (ch == '\n' || ch == '\r') {
+            if (cmd_i > 0) {
+              cmd[cmd_i] = '\0';
+
+              char type;
+              sscanf(cmd, "%c", &type);
+              send_message_over(cmd);
+              if (type == '>' || type == '<') {
+                send_message_over("ACK\n");
+                return type;
+              } else {
+                send_message_over("error\n");
+                send_message_over("ACK\n");
+                cmd_i = 0;
+              }
+            }
           } else {
-            send_message_over("error\n");
-            send_message_over("ACK\n");
-            cmd_i = 0;
+            if (cmd_i < CMD_BUF_LEN - 1) {
+              cmd[cmd_i++] = ch;
+            }
           }
         }
-      } else {
-        if (cmd_i < CMD_BUF_LEN - 1) {
-          cmd[cmd_i++] = ch;
-        }
       }
-    }
   }
+
+  // Timeout case when both attempts fail
+  send_message_over("timeout\n");
+  return 0;
 }
+
+
+  // while (1) {
+  //   send_message_over("snap\n"); // tell rpi to handle this
+  //   uint8_t ch;
+
+  //   if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+
+  //     if (ch == '\n' || ch == '\r') {
+  //       if (cmd_i > 0) {
+  //         cmd[cmd_i] = '\0';
+
+  //         char type;
+  //         sscanf(cmd, "%c", &type);
+  //         send_message_over(cmd);
+  //         if (type == '>' || type == '<') {
+  //           send_message_over("ACK\n");
+  //           return type;
+  //         } else {
+  //           send_message_over("error\n");
+  //           send_message_over("ACK\n");
+  //           cmd_i = 0;
+  //         }
+  //       }
+  //     } else {
+  //       if (cmd_i < CMD_BUF_LEN - 1) {
+  //         cmd[cmd_i++] = ch;
+  //       }
+  //     }
+  //   }
+  // }
 
 float task_two_forward_to_obstacle(int speed,
                                    float obstacle_clearance_distance) {

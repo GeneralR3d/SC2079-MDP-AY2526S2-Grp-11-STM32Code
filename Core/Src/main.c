@@ -1680,23 +1680,21 @@ void task_two() {
 
   // turn according to picture (arrow)
   if (direction == '<') {
-    cmd_turn_left(90, 3000,
-                  40); // values may be wrong calibrate everything below
-    Drive_Forward_ToCM(5, 3000);
-    cmd_turn_right(90, 3000, 40);
-    Drive_Forward_ToCM(10, 3000);
-    cmd_turn_right(90, 3000, 40);
-    Drive_Forward_ToCM(5, 3000);
-    cmd_turn_left(90, 3000, 40);
+	Turn_Car(90, speed, -45, 0); // values may be wrong calibrate everything below
+    Drive_Forward_ToCM(5, speed);
+    Turn_Car(90, speed, 45, 0);
+    Drive_Forward_ToCM(10, speed);
+    Turn_Car(90, speed, 45, 0);
+    Drive_Forward_ToCM(5, speed);
+    Turn_Car(90, speed, -45, 0);
   } else if (direction == '>') {
-    cmd_turn_right(90, 3000,
-                   40); // values may be wrong calibrate everything below
-    Drive_Forward_ToCM(5, 3000);
-    cmd_turn_left(90, 3000, 40);
-    Drive_Forward_ToCM(10, 3000);
-    cmd_turn_left(90, 3000, 40);
-    Drive_Forward_ToCM(5, 3000);
-    cmd_turn_right(90, 3000, 40);
+    Turn_Car(90, speed, 45, 0); // values may be wrong calibrate everything below
+    Drive_Forward_ToCM(5, speed);
+    Turn_Car(90, speed, -45, 0);
+    Drive_Forward_ToCM(10, speed);
+    Turn_Car(90, speed, -45, 0);
+    Drive_Forward_ToCM(5, speed);
+    Turn_Car(90, speed, 45, 0);
   }
 
   float second_dist_travelled =
@@ -1708,34 +1706,32 @@ void task_two() {
 
   // turn according to picture (arrow)
   if (direction == '<') {
-    cmd_turn_left(90, 3000,
-                  40); // values may be wrong calibrate everything below
+    Turn_Car(90, speed, -45, 0); // values may be wrong calibrate everything below
     float half_horizontal_dist = task_two_forward_ir(speed, direction);
-    cmd_turn_right(90, 3000, 40);
+    Turn_Car(90, speed, 45, 0);
     float vertical_dist = task_two_forward_ir(speed, direction);
-    cmd_turn_right(90, 3000, 40);
+    Turn_Car(90, speed, 45, 0);
     Drive_Forward_ToCM(half_horizontal_dist*2, speed); // may be completely off
-    cmd_turn_right(90, 3000, 40);
+    Turn_Car(90, speed, 45, 0);
     
-    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, int base_pwm); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
-    cmd_turn_right(90, 3000, 40);
+    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, speed); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
+    Turn_Car(90, speed, 45, 0);
     Drive_Forward_ToCM(half_horizontal_dist, speed);
-    cmd_turn_left(90, 3000, 40);
+    Turn_Car(90, speed, -45, 0);
 
   } else if (direction == '>') {
-    cmd_turn_right(90, 3000,
-                   40); // values may be wrong calibrate everything below
+    Turn_Car(90, speed, 45, 0); // values may be wrong calibrate everything below
     float half_horizontal_dist = task_two_forward_ir(speed, direction);
-    cmd_turn_left(90, 3000, 40);
+    Turn_Car(90, speed, -45, 0);
     float vertical_dist = task_two_forward_ir(speed, direction);
-    cmd_turn_left(90, 3000, 40);
+    Turn_Car(90, speed, -45, 0);
     Drive_Forward_ToCM(half_horizontal_dist*2, speed); // may be completely off
-    cmd_turn_left(90, 3000, 40);
+    Turn_Car(90, speed, -45, 0);
 
-    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, int base_pwm); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
-    cmd_turn_left(90, 3000, 40);
+    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, speed); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
+    Turn_Car(90, speed, -45, 0);
     Drive_Forward_ToCM(half_horizontal_dist, speed);
-    cmd_turn_right(90, 3000, 40);
+    Turn_Car(90, speed, 45, 0);
 
   }
 

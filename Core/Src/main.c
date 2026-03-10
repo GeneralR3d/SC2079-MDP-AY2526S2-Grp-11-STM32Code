@@ -45,8 +45,10 @@ const float COUNTS_PER_CM_R_REVERSE = 79.29f;
 volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
-float TURN_RADIUS_RIGHT = 25.5f; // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_LEFT = 25.25f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_RIGHT = 24.5f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT = 24.5f; // min turning radius (cm) when steering is 45°
+float GYRO_LEFT_BIAS = 133.18f;
+float GYRO_RIGHT_BIAS = 129.52f;
 
 // Ackermann differential steering constants (measure your car!)
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
@@ -902,9 +904,24 @@ int ICM20948_Init(void) {
   ICM20948_WriteReg(0, 0x05, 0x00); // disable cycle mode
 
   // Set accel = ±2g, gyro = ±250 dps
-  ICM20948_WriteReg(2, 0x14, 0x00); // accel config
-  ICM20948_WriteReg(2, 0x01, 0x00); // gyro config
-
+  ICM20948_WriteReg(2, 0x14, 0x00); // accel config (no filter by default)
+  
+  // Gyro Config 1: 
+  // [2:1] GYRO_FS_SEL = 00b (±250 dps)
+  // [0] GYRO_FCHOICE = 1b (Enable Gyro DLPF)
+  ICM20948_WriteReg(2, 0x01, 0x01); // gyro config (fs=250dps, DLPF=enabled)
+  
+  // Gyro Config 2: (GYRO_DLPFCFG)
+  // Options: 
+  // 0 = 196.6 Hz bandwidth, 3.1 ms latency
+  // 1 = 151.8 Hz bandwidth, 3.4 ms latency
+  // 2 = 119.5 Hz bandwidth, 4.1 ms latency
+  // 3 = 51.2 Hz bandwidth, 7.3 ms latency
+  // 4 = 23.9 Hz bandwidth, 14.5 ms latency
+  // 5 = 11.6 Hz bandwidth, 28.5 ms latency
+  // 6 = 5.7 Hz bandwidth, 56.4 ms latency
+  ICM20948_WriteReg(2, 0x02, 0x03); // Setting DLPFCFG = 3 (51.2Hz BW) 
+  
   return 0;
 }
 
@@ -923,15 +940,15 @@ void ICM20948_ReadRaw(int16_t *ax, int16_t *ay, int16_t *az, int16_t *gx,
 
 // Add this after IMU initialization
 float calibrate_gyro_bias() {
-  float bias_sum = 0;
+  float bias_sum_raw = 0;
   const int samples = 200; // Increased samples for better stability
   for (int i = 0; i < samples; i++) {
     int16_t ax, ay, az, gx, gy, gz;
     ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
-    bias_sum += gz / 131.0f;
+    bias_sum_raw += (float)gz;
     HAL_Delay(5); // Smaller delay, more samples
   }
-  return bias_sum / (float)samples;
+  return bias_sum_raw / (float)samples; // Return RAW bias
 }
 
 // Global variable
@@ -1137,12 +1154,26 @@ void Drive_Forward_Until_Obstacle(int base_pwm,
     HAL_Delay(50);
   }
 }
+void Reset_Yaw_Integration(void) {
+    yaw_angle = 0.0f;
+    gyro_gz_filtered = 0.0f;
+    // We also need to reset the previous reading so the trapezoidal integration
+    // doesn't spike if the previous turn ended abruptly at a high rotation speed.
+    extern float gyro_gz_prev;
+    gyro_gz_prev = 0.0f;
+}
+
+float gyro_gz_prev = 0.0f;
 
 void Update_Yaw(void) {
-  static float gz_prev = 0.0f;
+  static float gz_dps_corrected = 0.0f;
   const float alpha =
       0.6f; // weight of NEW value: higher = faster response / less lag
-  const float GZ_DEADZONE = 0.5f;
+  
+  // INCREASE DEADZONE: Vibration from the motors natively adds noise to the gyro.
+  // When the robot is at a standstill or "final crawl", the motors humming causes
+  // micro-vibrations which will be integrated as yaw drift if the deadzone is too small.
+  const float GZ_DEADZONE = 1.5f; 
 
   uint32_t now = HAL_GetTick();
   float dt = (now - last_time) / 1000.0f;
@@ -1153,7 +1184,21 @@ void Update_Yaw(void) {
   int16_t ax, ay, az, gx, gy, gz;
   ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
 
-  float gz_dps_corrected = (gz / 131.0f) - gyro_z_bias;
+// Subtract hardware offset FIRST before determining turn direction
+float gz_raw = (float)gz;
+float gz_corrected_raw = gz_raw - gyro_z_bias;
+
+// Now determine turn direction based on actual motion
+if (gz_corrected_raw > 0) {
+    // Math: 131.0 * (OLED_Reported_Left / Real_Life_Degrees)
+    // 131.0 * (85.0 / 90.0) = 123.7
+    gz_dps_corrected = gz_corrected_raw / GYRO_LEFT_BIAS; 
+} 
+else {
+    // Math: 131.0 * (OLED_Reported_Right / Real_Life_Degrees)
+    // 131.0 * (96.0 / 90.0) = 139.7
+    gz_dps_corrected = gz_corrected_raw / GYRO_RIGHT_BIAS;
+}
 
   if (fabsf(gz_dps_corrected) < GZ_DEADZONE) {
     gz_dps_corrected = 0.0f;
@@ -1165,8 +1210,8 @@ void Update_Yaw(void) {
       alpha * gz_dps_corrected + (1.0f - alpha) * gyro_gz_filtered;
 
   // Trapezoidal integration for better precision
-  yaw_angle += (gz_prev + gz_dps_corrected) * 0.5f * dt;
-  gz_prev = gz_dps_corrected;
+  yaw_angle += (gyro_gz_prev + gz_dps_corrected) * 0.5f * dt;
+  gyro_gz_prev = gz_dps_corrected;
 }
 
 /**
@@ -1224,7 +1269,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
   if (steer_angle > 45)
     steer_angle = 45;
 
-  yaw_angle = 0;        // reset yaw integration
+  Reset_Yaw_Integration();
   gyro_gz_filtered = 0; // reset filter memory to prevent drift inheritance
   reset_encoders();     // reset odometry when starting the turn
 
@@ -1254,7 +1299,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
   last_time = HAL_GetTick();
   uint32_t start_time = HAL_GetTick();
   uint32_t last_slow_tick = 0;
-  const uint32_t timeout_ms = 60000;
+  const uint32_t timeout_ms = 8000;
 
   while (1) {
     uint32_t loop_tick = HAL_GetTick();
@@ -1338,15 +1383,15 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     Motor_forward_simple(pwm_left, pwm_right);
 
     // Run non-critical slow tasks (US sensor, OLED) only every 50ms
-    if (loop_tick - last_slow_tick > 50) {
-      last_slow_tick = loop_tick;
-      if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
-        HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-        // Motor_stop();
-        HAL_Delay(1000);
-        HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-        // break;
-      }
+    // if (loop_tick - last_slow_tick > 50) {
+    //   last_slow_tick = loop_tick;
+    //   if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
+    //     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
+    //     // Motor_stop();
+    //     HAL_Delay(1000);
+    //     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
+    //     // break;
+    //   }
 
       // Debug output
       //            if (use_distance) {
@@ -1360,7 +1405,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
                target_deg_abs, cm_now, target_cm_abs);
       OLED_ShowString(0, 30, (uint8_t *)buf);
       OLED_Refresh_Gram();
-    }
+    // }
 
     HAL_Delay(5); // Faster loop frequency (200Hz)
   }
@@ -1393,7 +1438,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
   if (steer_angle > 45)
     steer_angle = 45;
 
-  yaw_angle = 0;        // reset yaw integration
+  Reset_Yaw_Integration();
   gyro_gz_filtered = 0; // reset filter memory to prevent drift inheritance
   reset_encoders();     // reset odometry when starting the turn
 
@@ -1553,7 +1598,7 @@ void cmd_turn_left(float target_cm)
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
     float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
 
-    Turn_Car(target_deg, 1500, -45,0);
+    Turn_Car(target_deg, 3000, -45,0);
 }
 
 void cmd_turn_left_reverse(float target_cm)
@@ -1561,7 +1606,7 @@ void cmd_turn_left_reverse(float target_cm)
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
     float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, 1500, -45, 0);
+    Turn_Car_Reverse(target_deg, 3000, -45, 0);
 }
 
 void cmd_turn_right(float target_cm)
@@ -1569,7 +1614,7 @@ void cmd_turn_right(float target_cm)
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
     float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
 
-    Turn_Car(target_deg, 1500, 45, 0);
+    Turn_Car(target_deg, 3000, 45, 0);
 }
 
 void cmd_turn_right_reverse(float target_cm)
@@ -1577,7 +1622,7 @@ void cmd_turn_right_reverse(float target_cm)
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
     float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, 1500, 45, 0);
+    Turn_Car_Reverse(target_deg, 3000, 45, 0);
 }
 
 void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm) {
@@ -1948,6 +1993,7 @@ int main(void) {
   if (ICM20948_Init() == 0) {
     sprintf(buf, "ICM OK");
     // Calibrate AFTER initialization
+    HAL_Delay(2000);
     gyro_z_bias = calibrate_gyro_bias();
     // sprintf(buf, "Bias: %.2f", gyro_z_bias);
     // OLED_ShowString(0, 20, (uint8_t *)buf);
@@ -2100,11 +2146,11 @@ int main(void) {
 
   // HAL_Delay(10000);
   // cmd_turn_left(90.0f, pwmMin, 60.0f);
-  Turn_Car(360.0f, 1500, 45,0);
+  Turn_Car(360.0f, 3000, 45,0);
   
-  HAL_Delay(10000);
+  // HAL_Delay(10000);
 
-  Turn_Car(360.0f, 1500, -45,0);
+  // Turn_Car(380.0f, 1500, -45,0);
   // Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   // Turn_Car(-180.0f, 2500, -40,0);
 

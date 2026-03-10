@@ -38,11 +38,15 @@ static int PWM_TRIM_REVERSE =
 const float COUNTS_PER_CM_L = 73.7f;
 const float COUNTS_PER_CM_R = 77.5f;
 
+const float COUNTS_PER_CM_L_REVERSE = 78.17f;
+const float COUNTS_PER_CM_R_REVERSE = 79.29f;
+
 // Global servo center position (can be tweaked)
 volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
-float TURN_RADIUS = 24.75f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_RIGHT = 25.5f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT = 25.25f; // min turning radius (cm) when steering is 45°
 
 // Ackermann differential steering constants (measure your car!)
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
@@ -470,8 +474,8 @@ void Motor_forward(int pwmVal) {
     correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-  int left_offset = -450;
-  int right_offset = 0;
+  int left_offset = 0;
+  int right_offset = -100;
 
   // --- Apply correction + offsets ---
   int left_pwm = pwmVal + left_offset + correction;
@@ -555,8 +559,8 @@ void Motor_reverse(int pwmVal) {
     correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-  int left_offset = -450;
-  int right_offset = 0;
+  int left_offset = 0;
+  int right_offset = -100;
 
   // --- Apply correction + offsets ---
   int left_pwm = pwmVal + left_offset - correction;
@@ -715,8 +719,8 @@ static float cm_travelled_forward(void) {
 }
 
 static float cm_travelled_reverse(void) {
-  float cmL = (float)left_ticks_reverse() / COUNTS_PER_CM_L;
-  float cmR = (float)right_ticks_reverse() / COUNTS_PER_CM_R;
+  float cmL = (float)left_ticks_reverse() / COUNTS_PER_CM_L_REVERSE;
+  float cmR = (float)right_ticks_reverse() / COUNTS_PER_CM_R_REVERSE;
   return 0.5f * (cmL + cmR);
 }
 
@@ -1007,9 +1011,9 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin)
       pwm = pwmMin;
 
-    // Motor_forward(pwm);                        //feb 23
+     Motor_forward(pwm);                        //feb 23
     // Motor_forward_simple(pwm);
-    Motor_forward_advanced(pwm); // feb 23
+    //Motor_forward_advanced(pwm); // feb 23
 
     // Display progress
     // snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1059,11 +1063,22 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin)
       pwm = pwmMin;
 
-    Motor_reverse_advanced(pwm);
+    //Motor_reverse_advanced(pwm);
+    Motor_reverse(pwm);
 
     // Display progress
-    snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 10, (uint8_t *)buf);
+    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    OLED_ShowString(0, 10, (uint8_t*)buf);
+    // // show left encoder ticks for debugging
+    int32_t l = left_ticks_reverse();
+    int32_t r = right_ticks_reverse();
+    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    OLED_ShowString(0, 20, (uint8_t*)buf);
+
+
+    // Display progress
+    // snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
+    // OLED_ShowString(0, 10, (uint8_t *)buf);
     OLED_Refresh_Gram();
   }
   Motor_forward_simple(1000, 1000);
@@ -1292,7 +1307,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     int pwm_right = current_pwm;
 
     float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
-    if (steer_rad > 0.02f) { // avoid division by zero for near-straight
+    if (steer_rad > 0.01f) { // avoid division by zero for near-straight
       float R_inner = WHEELBASE_CM / tanf(steer_rad);
       float R_outer = R_inner + TRACK_WIDTH_CM;
       float ratio = R_inner / R_outer; // < 1.0
@@ -1536,33 +1551,33 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 void cmd_turn_left(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
 
-    Turn_Car(target_deg, TASK1_PWM, -45,0);
+    Turn_Car(target_deg, 1500, -45,0);
 }
 
 void cmd_turn_left_reverse(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, TASK1_PWM, -45, 0);
+    Turn_Car_Reverse(target_deg, 1500, -45, 0);
 }
 
 void cmd_turn_right(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
 
-    Turn_Car(target_deg, TASK1_PWM, 45, 0);
+    Turn_Car(target_deg, 1500, 45, 0);
 }
 
 void cmd_turn_right_reverse(float target_cm)
 {
     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS) * (180.0f / PI);
+    float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
 
-    Turn_Car_Reverse(target_deg, TASK1_PWM, 45, 0);
+    Turn_Car_Reverse(target_deg, 1500, 45, 0);
 }
 
 void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm) {
@@ -1666,7 +1681,7 @@ void Measure_Motor_Speed_forward(int pwmVal) {
 void task_two() {
   send_message_over("ACK\n");
   int speed = 3000;
-  float obstacle_clearance_distance = 50; // need to calibrate actual distance
+  float obstacle_clearance_distance = 52; // need to calibrate actual distance
   float obstacle_clearance_actual_distance =
       0; // calculate actual distance between ultrasonic and obstacle
 
@@ -1775,6 +1790,7 @@ char task_two_uart() {
 float task_two_forward_to_obstacle(int speed,
                                    float obstacle_clearance_distance) {
   reset_encoders();
+  
 
   while (1) {
     if (HCSR04_Read() <= obstacle_clearance_distance) {
@@ -1967,6 +1983,86 @@ int main(void) {
 
   /********************************our testing*** */
 
+//  Turn_Car(90, 3000, 45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, 45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, 45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, 45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, -45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, -45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, -45, 0);
+//  HAL_Delay(10000);
+//  Turn_Car(90, 3000, -45, 0);
+//
+//  Turn_Car(90, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(30, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(30, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(30, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 3000, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 3000, 45, 0);
+//
+//
+//  HAL_Delay(20000);
+//
+//  Turn_Car(90, 3000, 45, 0);
+//  Turn_Car(45, 3000, 45, 0);
+//  Turn_Car(45, 3000, 45, 0);
+//  Turn_Car(30, 3000, 45, 0);
+//  Turn_Car(30, 3000, 45, 0);
+//  Turn_Car(30, 3000, 45, 0);
+//  Turn_Car(45, 3000, 45, 0);
+//  Turn_Car(45, 3000, 45, 0);
+//
+//
+//
+//  Turn_Car(90, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(30, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(30, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(30, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 1500, 45, 0);
+//  HAL_Delay(5000);
+//  Turn_Car(45, 1500, 45, 0);
+//
+//
+//  HAL_Delay(20000);
+//
+//  Turn_Car(90, 1500, 45, 0);
+//  Turn_Car(45, 1500, 45, 0);
+//  Turn_Car(45, 1500, 45, 0);
+//  Turn_Car(30, 1500, 45, 0);
+//  Turn_Car(30, 1500, 45, 0);
+//  Turn_Car(30, 1500, 45, 0);
+//  Turn_Car(45, 1500, 45, 0);
+//  Turn_Car(45, 1500, 45, 0);
+//
+//
+
+
+
+
+  
   //// Path 1: Obstacle at (70, 70) face L
   // cmd_turn_left(40, 3000, 3.86);
   // Drive_Forward_ToCM(28.65, 3000);
@@ -2004,7 +2100,11 @@ int main(void) {
 
   // HAL_Delay(10000);
   // cmd_turn_left(90.0f, pwmMin, 60.0f);
-  // Turn_Car(360.0f, pwmMin, -45,0);
+  Turn_Car(360.0f, 1500, 45,0);
+  
+  HAL_Delay(10000);
+
+  Turn_Car(360.0f, 1500, -45,0);
   // Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   // Turn_Car(-180.0f, 2500, -40,0);
 

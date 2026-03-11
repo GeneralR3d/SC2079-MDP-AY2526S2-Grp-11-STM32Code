@@ -1597,52 +1597,81 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 #define ARC_BIN_SHORT_MAX 40.0f
 #define ARC_BIN_MID_MAX   60.0f
 
-float D_LEFT_SHORT  = -45.0f;
-float D_LEFT_MID    = -42.5f;
-float D_LEFT_LONG   = -40.0f;
 
-float D_RIGHT_SHORT  = 45.0f;
-float D_RIGHT_MID    = 45.0f;
-float D_RIGHT_LONG   = 45.0f;
+// LEFT STEER ANGLES
+float STEER_ANGLE_LEFT_SHORT  = -45.0f;
+float STEER_ANGLE_LEFT_MID    = -42.5f;
+float STEER_ANGLE_LEFT_LONG   = -42.0f;
+
+float R_LEFT_SHORT  = 24.5f;
+float R_LEFT_MID    = 25.0f;
+float R_LEFT_LONG   = 27.5f;
+
+// RIGHT
+
+float STEER_ANGLE_RIGHT_SHORT  = 45.0f;
+float STEER_ANGLE_RIGHT_MID    = 45.0f;
+float STEER_ANGLE_RIGHT_LONG   = 45.0f;
+
+float R_RIGHT_SHORT  = 24.5f;
+float R_RIGHT_MID    = 24.5f;
+float R_RIGHT_LONG  = 24.5f;
+
+static inline float select_right_radius(float arc_cm_abs) {
+  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_RIGHT_SHORT;
+  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_RIGHT_MID;
+  return R_RIGHT_LONG;
+}
+
+static inline float select_left_radius(float arc_cm_abs) {
+  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_LEFT_SHORT;
+  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_LEFT_MID;
+  return R_LEFT_LONG;
+}
+
 
 static inline int select_left_steer_angle(float target_cm) {
-  if (target_cm <= ARC_BIN_SHORT_MAX) return D_LEFT_SHORT;
-  if (target_cm <= ARC_BIN_MID_MAX) return D_LEFT_MID;
-  return D_LEFT_LONG;
+  if (target_cm <= ARC_BIN_SHORT_MAX) return STEER_ANGLE_LEFT_SHORT;
+  if (target_cm <= ARC_BIN_MID_MAX) return STEER_ANGLE_LEFT_MID;
+  return STEER_ANGLE_LEFT_LONG;
 }
 
 static inline int select_right_steer_angle(float target_cm) {
-  if (target_cm <= ARC_BIN_SHORT_MAX) return D_RIGHT_SHORT;
-  if (target_cm <= ARC_BIN_MID_MAX) return D_RIGHT_MID;
-  return D_RIGHT_LONG;
+  if (target_cm <= ARC_BIN_SHORT_MAX) return STEER_ANGLE_RIGHT_SHORT;
+  if (target_cm <= ARC_BIN_MID_MAX) return STEER_ANGLE_RIGHT_MID;
+  return STEER_ANGLE_RIGHT_LONG;
 }
 
 void cmd_turn_left(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float target_deg = (arc / TURN_RADIUS_LEFT) * (180.0f / PI);
-  int steer_angle = select_left_steer_angle(target_cm);
+  float R = select_left_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  int steer_angle = select_left_steer_angle(arc);
   Turn_Car(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_right(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float target_deg = (arc / TURN_RADIUS_RIGHT) * (180.0f / PI);
-  int steer_angle = select_right_steer_angle(target_cm);
+  float R = select_right_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  int steer_angle = select_right_steer_angle(arc);
   Turn_Car(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_left_reverse(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float target_deg = (arc / TURN_RADIUS_LEFT) * (180.0f / PI);
-  int steer_angle = select_left_steer_angle(target_cm);
+  float R = select_left_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  int steer_angle = select_left_steer_angle(arc);
   Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_right_reverse(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float target_deg = (arc / TURN_RADIUS_RIGHT) * (180.0f / PI);
-  int steer_angle = select_right_steer_angle(target_cm);
+  float R = select_right_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  int steer_angle = select_right_steer_angle(arc);
   Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
 }
 
@@ -2087,8 +2116,8 @@ int main(void) {
   int angle_dir = -1;
 
 
-  float quarter_turn_left = 0.25 * TURN_RADIUS_LEFT * 2.0 * PI;
-  float semi_turn_left = 0.50 * TURN_RADIUS_LEFT * 2.0 * PI;
+  float quarter_turn_left = 0.25f * TURN_RADIUS_LEFT * 2.0 * PI;
+  float semi_turn_left = 0.50f * TURN_RADIUS_LEFT * 2.0 * PI;
   float full_turn_left = TURN_RADIUS_LEFT * 2.0 * PI;
 
   float quarter_turn_right = 0.25 * TURN_RADIUS_RIGHT * 2.0 * PI;
@@ -2100,14 +2129,12 @@ int main(void) {
   // Left
   for(int i = 0; i < 4; ++i) {
     cmd_turn_left(quarter_turn_left);
-    //Turn_Car(90.0f, 3000, angle_dir * 45, 0);
     HAL_Delay(delay_btw_cmds);
   }
 
   HAL_Delay(delay_after_cmds);
 
   for(int i = 0; i < 2; ++i) {
-    //Turn_Car(180.0f, 3000, angle_dir * 45, 0);
     cmd_turn_left(semi_turn_left);
     HAL_Delay(delay_btw_cmds);
   }
@@ -2116,36 +2143,32 @@ int main(void) {
 
   for(int i = 0; i < 1; ++i) {
     cmd_turn_left(full_turn_left);
-    //Turn_Car(360.0f, 3000, angle_dir * 45, 0);
     HAL_Delay(delay_btw_cmds);
   }
 
   HAL_Delay(delay_after_cmds);
 
   // Right
-  angle_dir = 1;
+  // angle_dir = 1;
 
-  for(int i = 0; i < 4; ++i) {
-    cmd_turn_right(quarter_turn_right);
-    //Turn_Car(90.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(delay_btw_cmds);
-  }
+  // for(int i = 0; i < 4; ++i) {
+  //   cmd_turn_right(quarter_turn_right);
+  //   HAL_Delay(delay_btw_cmds);
+  // }
 
-  HAL_Delay(delay_after_cmds);
+  // HAL_Delay(delay_after_cmds);
 
-  for(int i = 0; i < 2; ++i) {
-    cmd_turn_right(semi_turn_right);
-    //Turn_Car(180.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(delay_btw_cmds);
-  }
+  // for(int i = 0; i < 2; ++i) {
+  //   cmd_turn_right(semi_turn_right);
+  //   HAL_Delay(delay_btw_cmds);
+  // }
 
-  HAL_Delay(delay_after_cmds);
+  // HAL_Delay(delay_after_cmds);
 
-  for(int i = 0; i < 1; ++i) {
-    cmd_turn_right(full_turn_right);
-    //Turn_Car(360.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(3000);
-  }
+  // for(int i = 0; i < 1; ++i) {
+  //   cmd_turn_right(full_turn_right);
+  //   HAL_Delay(3000);
+  // }
 
 
 

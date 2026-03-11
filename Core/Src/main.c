@@ -46,7 +46,7 @@ volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
 float TURN_RADIUS_RIGHT = 24.5f; // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_LEFT = 24.5f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT = 24.5f;  // min turning radius (cm) when steering is 45°
 float GYRO_LEFT_BIAS = 131.33f;
 float GYRO_RIGHT_BIAS = 130.959f;
 
@@ -54,11 +54,10 @@ float GYRO_RIGHT_BIAS = 130.959f;
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
 #define TRACK_WIDTH_CM 16.2f // distance between the two rear wheels
 
-// TASK 1 
+// TASK 1
 #define TASK1_PWM 3000
 
-
-float yaw_angle = 0;   // global or static variable
+float yaw_angle = 0; // global or static variable
 uint32_t last_time = 0;
 float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
 
@@ -69,8 +68,8 @@ int cmd_index = 0;
 
 // Command queue structures for batching execution
 typedef struct {
-    char type;
-    float value;
+  char type;
+  float value;
 } Command;
 
 #define MAX_COMMANDS 100
@@ -145,6 +144,7 @@ static inline int32_t right_ticks_forward(void);
 static inline int32_t left_ticks_reverse(void);
 static inline int32_t right_ticks_reverse(void);
 
+void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
 void cmd_turn_left(float target_cm);
@@ -223,69 +223,71 @@ void send_message_over(const char *input) {
 }
 
 void process_commands(void) {
-    // Run all accumulated commands in the buffer
-    for (int i = 0; i < cmd_count; i++) {
-        Command c = cmd_array[i];
-        
-        if (c.type == 'f') {
-            Drive_Forward_ToCM(c.value, TASK1_PWM);
-        } else if (c.type == 'b') {
-            Drive_Reverse_ToCM(c.value, TASK1_PWM);
-        } else if (c.type == 'l') {
-            if (c.value >= 0) {
-                cmd_turn_left(c.value);
-            } else {
-                cmd_turn_left_reverse(-c.value);
-            }
-        } else if (c.type == 'r') {
-            if (c.value >= 0) {
-                cmd_turn_right(c.value);
-            } else {
-                cmd_turn_right_reverse(-c.value);
-            }
-        } else if (c.type == 'k') {
-            // KACHAA command exactly as requested
-            Motor_stop();
-            send_message_over("snap\n");
-            HAL_Delay(5000); // Wait 5 sec for RPI to take photo
-        }
+  // Run all accumulated commands in the buffer
+  for (int i = 0; i < cmd_count; i++) {
+    Command c = cmd_array[i];
+
+    if (c.type == 'f') {
+      Drive_Forward_ToCM(c.value, TASK1_PWM);
+    } else if (c.type == 'b') {
+      Drive_Reverse_ToCM(c.value, TASK1_PWM);
+    } else if (c.type == 'l') {
+      if (c.value >= 0) {
+        cmd_turn_left(c.value);
+      } else {
+        cmd_turn_left_reverse(-c.value);
+      }
+    } else if (c.type == 'r') {
+      if (c.value >= 0) {
+        cmd_turn_right(c.value);
+      } else {
+        cmd_turn_right_reverse(-c.value);
+      }
+    } else if (c.type == 'k') {
+      // KACHAA command exactly as requested
+      Motor_stop();
+      send_message_over("snap\n");
+      HAL_Delay(5000); // Wait 5 sec for RPI to take photo
     }
-    
-    // Clear the command buffer after finishing all commands
-    cmd_count = 0;
+  }
+
+  // Clear the command buffer after finishing all commands
+  cmd_count = 0;
 }
 
 void store_command(char *cmd) {
-    char type;
-    float p1 = 0;
-    int parsed_csv = sscanf(cmd, "%c,%f", &type, &p1);
+  char type;
+  float p1 = 0;
+  int parsed_csv = sscanf(cmd, "%c,%f", &type, &p1);
 
-    if (parsed_csv >= 1 && (type == 'f' || type == 'b' || type == 'l' || type == 'r' || type == 'k' || type == 'K')) {
-        // Handle lower or uppercase K
-        if (type == 'K') type = 'k';
+  if (parsed_csv >= 1 && (type == 'f' || type == 'b' || type == 'l' ||
+                          type == 'r' || type == 'k' || type == 'K')) {
+    // Handle lower or uppercase K
+    if (type == 'K')
+      type = 'k';
 
-        if (cmd_count < MAX_COMMANDS) {
-            cmd_array[cmd_count].type = type;
-            cmd_array[cmd_count].value = p1;
-            cmd_count++;
-            
-            // "sends ACK after each command recieved"
-            send_message_over("ACK\n");
-        } else {
-            char err[64];
-            snprintf(err, sizeof(err), "ERR: Buffer Full\r\n");
-            HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
-            // Continue sending ACK to avoid stalling the RPI
-            send_message_over("ACK\n");
-        }
-        return;
+    if (cmd_count < MAX_COMMANDS) {
+      cmd_array[cmd_count].type = type;
+      cmd_array[cmd_count].value = p1;
+      cmd_count++;
+
+      // "sends ACK after each command recieved"
+      send_message_over("ACK\n");
+    } else {
+      char err[64];
+      snprintf(err, sizeof(err), "ERR: Buffer Full\r\n");
+      HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
+      // Continue sending ACK to avoid stalling the RPI
+      send_message_over("ACK\n");
     }
+    return;
+  }
 
-    // Unknown / unsupported command
-    char err[64];
-    snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
-    HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
-    send_message_over("ACK\n");
+  // Unknown / unsupported command
+  char err[64];
+  snprintf(err, sizeof(err), "ERR: Unknown cmd %s\r\n", cmd);
+  HAL_UART_Transmit(&huart3, (uint8_t *)err, strlen(err), HAL_MAX_DELAY);
+  send_message_over("ACK\n");
 }
 
 void HAL_TIM_IC_CaptureCallback(TIM_HandleTypeDef *htim) {
@@ -905,14 +907,14 @@ int ICM20948_Init(void) {
 
   // Set accel = ±2g, gyro = ±250 dps
   ICM20948_WriteReg(2, 0x14, 0x00); // accel config (no filter by default)
-  
-  // Gyro Config 1: 
+
+  // Gyro Config 1:
   // [2:1] GYRO_FS_SEL = 00b (±250 dps)
   // [0] GYRO_FCHOICE = 1b (Enable Gyro DLPF)
   ICM20948_WriteReg(2, 0x01, 0x01); // gyro config (fs=250dps, DLPF=enabled)
-  
+
   // Gyro Config 2: (GYRO_DLPFCFG)
-  // Options: 
+  // Options:
   // 0 = 196.6 Hz bandwidth, 3.1 ms latency
   // 1 = 151.8 Hz bandwidth, 3.4 ms latency
   // 2 = 119.5 Hz bandwidth, 4.1 ms latency
@@ -920,8 +922,8 @@ int ICM20948_Init(void) {
   // 4 = 23.9 Hz bandwidth, 14.5 ms latency
   // 5 = 11.6 Hz bandwidth, 28.5 ms latency
   // 6 = 5.7 Hz bandwidth, 56.4 ms latency
-  ICM20948_WriteReg(2, 0x02, 0x03); // Setting DLPFCFG = 3 (51.2Hz BW) 
-  
+  ICM20948_WriteReg(2, 0x02, 0x03); // Setting DLPFCFG = 3 (51.2Hz BW)
+
   return 0;
 }
 
@@ -1028,9 +1030,9 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin)
       pwm = pwmMin;
 
-     Motor_forward(pwm);                        //feb 23
+    Motor_forward(pwm); // feb 23
     // Motor_forward_simple(pwm);
-    //Motor_forward_advanced(pwm); // feb 23
+    // Motor_forward_advanced(pwm); // feb 23
 
     // Display progress
     // snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1080,18 +1082,17 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin)
       pwm = pwmMin;
 
-    //Motor_reverse_advanced(pwm);
+    // Motor_reverse_advanced(pwm);
     Motor_reverse(pwm);
 
     // Display progress
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 10, (uint8_t*)buf);
+    OLED_ShowString(0, 10, (uint8_t *)buf);
     // // show left encoder ticks for debugging
     int32_t l = left_ticks_reverse();
     int32_t r = right_ticks_reverse();
     snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    OLED_ShowString(0, 20, (uint8_t*)buf);
-
+    OLED_ShowString(0, 20, (uint8_t *)buf);
 
     // Display progress
     // snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
@@ -1155,12 +1156,12 @@ void Drive_Forward_Until_Obstacle(int base_pwm,
   }
 }
 void Reset_Yaw_Integration(void) {
-    yaw_angle = 0.0f;
-    gyro_gz_filtered = 0.0f;
-    // We also need to reset the previous reading so the trapezoidal integration
-    // doesn't spike if the previous turn ended abruptly at a high rotation speed.
-    extern float gyro_gz_prev;
-    gyro_gz_prev = 0.0f;
+  yaw_angle = 0.0f;
+  gyro_gz_filtered = 0.0f;
+  // We also need to reset the previous reading so the trapezoidal integration
+  // doesn't spike if the previous turn ended abruptly at a high rotation speed.
+  extern float gyro_gz_prev;
+  gyro_gz_prev = 0.0f;
 }
 
 float gyro_gz_prev = 0.0f;
@@ -1169,11 +1170,12 @@ void Update_Yaw(void) {
   static float gz_dps_corrected = 0.0f;
   const float alpha =
       0.6f; // weight of NEW value: higher = faster response / less lag
-  
-  // INCREASE DEADZONE: Vibration from the motors natively adds noise to the gyro.
-  // When the robot is at a standstill or "final crawl", the motors humming causes
-  // micro-vibrations which will be integrated as yaw drift if the deadzone is too small.
-  const float GZ_DEADZONE = 1.5f; 
+
+  // INCREASE DEADZONE: Vibration from the motors natively adds noise to the
+  // gyro. When the robot is at a standstill or "final crawl", the motors
+  // humming causes micro-vibrations which will be integrated as yaw drift if
+  // the deadzone is too small.
+  const float GZ_DEADZONE = 1.5f;
 
   uint32_t now = HAL_GetTick();
   float dt = (now - last_time) / 1000.0f;
@@ -1184,21 +1186,20 @@ void Update_Yaw(void) {
   int16_t ax, ay, az, gx, gy, gz;
   ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
 
-// Subtract hardware offset FIRST before determining turn direction
-float gz_raw = (float)gz;
-float gz_corrected_raw = gz_raw - gyro_z_bias;
+  // Subtract hardware offset FIRST before determining turn direction
+  float gz_raw = (float)gz;
+  float gz_corrected_raw = gz_raw - gyro_z_bias;
 
-// Now determine turn direction based on actual motion
-if (gz_corrected_raw > 0) {
+  // Now determine turn direction based on actual motion
+  if (gz_corrected_raw > 0) {
     // Math: 131.0 * (OLED_Reported_Left / Real_Life_Degrees)
     // 131.0 * (85.0 / 90.0) = 123.7
-    gz_dps_corrected = gz_corrected_raw / GYRO_LEFT_BIAS; 
-} 
-else {
+    gz_dps_corrected = gz_corrected_raw / GYRO_LEFT_BIAS;
+  } else {
     // Math: 131.0 * (OLED_Reported_Right / Real_Life_Degrees)
     // 131.0 * (96.0 / 90.0) = 139.7
     gz_dps_corrected = gz_corrected_raw / GYRO_RIGHT_BIAS;
-}
+  }
 
   if (fabsf(gz_dps_corrected) < GZ_DEADZONE) {
     gz_dps_corrected = 0.0f;
@@ -1393,18 +1394,18 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     //     // break;
     //   }
 
-      // Debug output
-      //            if (use_distance) {
-      //            snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
-      //                     abs_yaw, target_deg_abs, cm_now, target_cm_abs);
-      //            } else {
-      //            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°",
-      //            yaw_angle, target_deg_abs);
-      //            }
-      snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f", abs_yaw,
-               target_deg_abs, cm_now, target_cm_abs);
-      OLED_ShowString(0, 30, (uint8_t *)buf);
-      OLED_Refresh_Gram();
+    // Debug output
+    //            if (use_distance) {
+    //            snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f",
+    //                     abs_yaw, target_deg_abs, cm_now, target_cm_abs);
+    //            } else {
+    //            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°",
+    //            yaw_angle, target_deg_abs);
+    //            }
+    snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f", abs_yaw,
+             target_deg_abs, cm_now, target_cm_abs);
+    OLED_ShowString(0, 30, (uint8_t *)buf);
+    OLED_Refresh_Gram();
     // }
 
     HAL_Delay(5); // Faster loop frequency (200Hz)
@@ -1592,33 +1593,29 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
   OLED_Refresh_Gram();
 }
 
-
 // Bin thresholds (cm)
 #define ARC_BIN_SHORT_MAX 40.0f
-#define ARC_BIN_MID_MAX   60.0f
-
+#define ARC_BIN_MID_MAX 60.0f
 
 // OBSTACLE SET UP CONST
 
-float STEER_ANGLE_LEFT_SHORT  = -45.0f;
-float STEER_ANGLE_LEFT_MID    = -45.0f;
-float STEER_ANGLE_LEFT_LONG   = -45.0f;
+float STEER_ANGLE_LEFT_SHORT = -45.0f;
+float STEER_ANGLE_LEFT_MID = -45.0f;
+float STEER_ANGLE_LEFT_LONG = -45.0f;
 
-float R_LEFT_SHORT  = 24.5f;
-float R_LEFT_MID    = 24.5f;
-float R_LEFT_LONG   = 24.5f;
+float R_LEFT_SHORT = 24.5f;
+float R_LEFT_MID = 24.5f;
+float R_LEFT_LONG = 24.5f;
 
 // RIGHT
 
-float STEER_ANGLE_RIGHT_SHORT  = 45.0f;
-float STEER_ANGLE_RIGHT_MID    = 45.0f;
-float STEER_ANGLE_RIGHT_LONG   = 45.0f;
+float STEER_ANGLE_RIGHT_SHORT = 45.0f;
+float STEER_ANGLE_RIGHT_MID = 45.0f;
+float STEER_ANGLE_RIGHT_LONG = 45.0f;
 
-float R_RIGHT_SHORT  = 24.5f;
-float R_RIGHT_MID    = 24.5f;
-float R_RIGHT_LONG  = 24.5f;
-
-
+float R_RIGHT_SHORT = 24.5f;
+float R_RIGHT_MID = 24.5f;
+float R_RIGHT_LONG = 24.5f;
 
 // LEFT STEER ANGLES
 // float STEER_ANGLE_LEFT_SHORT  = -45.0f;
@@ -1626,8 +1623,8 @@ float R_RIGHT_LONG  = 24.5f;
 // float STEER_ANGLE_LEFT_LONG   = -42.0f;
 
 // float R_LEFT_SHORT  = 24.5f;
-// float R_LEFT_MID    = 25.0f;
-// float R_LEFT_LONG   = 27.5f;
+// float R_LEFT_MID    = 23.0f;
+// float R_LEFT_LONG   = 22.5f;
 
 // // RIGHT
 
@@ -1640,56 +1637,59 @@ float R_RIGHT_LONG  = 24.5f;
 // float R_RIGHT_LONG  = 24.5f;
 
 static inline float select_right_radius(float arc_cm_abs) {
-  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_RIGHT_SHORT;
-  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_RIGHT_MID;
+  if (arc_cm_abs <= ARC_BIN_SHORT_MAX)
+    return R_RIGHT_SHORT;
+  if (arc_cm_abs <= ARC_BIN_MID_MAX)
+    return R_RIGHT_MID;
   return R_RIGHT_LONG;
 }
 
 static inline float select_left_radius(float arc_cm_abs) {
-  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_LEFT_SHORT;
-  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_LEFT_MID;
+  if (arc_cm_abs <= ARC_BIN_SHORT_MAX)
+    return R_LEFT_SHORT;
+  if (arc_cm_abs <= ARC_BIN_MID_MAX)
+    return R_LEFT_MID;
   return R_LEFT_LONG;
 }
 
-
 static inline int select_left_steer_angle(float target_cm) {
-  if (target_cm <= ARC_BIN_SHORT_MAX) return STEER_ANGLE_LEFT_SHORT;
-  if (target_cm <= ARC_BIN_MID_MAX) return STEER_ANGLE_LEFT_MID;
+  if (target_cm <= ARC_BIN_SHORT_MAX)
+    return STEER_ANGLE_LEFT_SHORT;
+  if (target_cm <= ARC_BIN_MID_MAX)
+    return STEER_ANGLE_LEFT_MID;
   return STEER_ANGLE_LEFT_LONG;
 }
 
 static inline int select_right_steer_angle(float target_cm) {
-  if (target_cm <= ARC_BIN_SHORT_MAX) return STEER_ANGLE_RIGHT_SHORT;
-  if (target_cm <= ARC_BIN_MID_MAX) return STEER_ANGLE_RIGHT_MID;
+  if (target_cm <= ARC_BIN_SHORT_MAX)
+    return STEER_ANGLE_RIGHT_SHORT;
+  if (target_cm <= ARC_BIN_MID_MAX)
+    return STEER_ANGLE_RIGHT_MID;
   return STEER_ANGLE_RIGHT_LONG;
 }
 
-void cmd_turn_left(float target_cm)
-{
+void cmd_turn_left(float target_cm) {
   float arc = fabsf(target_cm);
   float R = select_left_radius(arc);
   float target_deg = (arc / R) * (180.0f / PI);
   int steer_angle = select_left_steer_angle(arc);
   Turn_Car(target_deg, 3000, steer_angle, 0);
 }
-void cmd_turn_right(float target_cm)
-{
+void cmd_turn_right(float target_cm) {
   float arc = fabsf(target_cm);
   float R = select_right_radius(arc);
   float target_deg = (arc / R) * (180.0f / PI);
   int steer_angle = select_right_steer_angle(arc);
   Turn_Car(target_deg, 3000, steer_angle, 0);
 }
-void cmd_turn_left_reverse(float target_cm)
-{
+void cmd_turn_left_reverse(float target_cm) {
   float arc = fabsf(target_cm);
   float R = select_left_radius(arc);
   float target_deg = (arc / R) * (180.0f / PI);
   int steer_angle = select_left_steer_angle(arc);
   Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
 }
-void cmd_turn_right_reverse(float target_cm)
-{
+void cmd_turn_right_reverse(float target_cm) {
   float arc = fabsf(target_cm);
   float R = select_right_radius(arc);
   float target_deg = (arc / R) * (180.0f / PI);
@@ -1699,32 +1699,36 @@ void cmd_turn_right_reverse(float target_cm)
 
 // void cmd_turn_left(float target_cm)
 // {
-//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
+//     // Calculate and override target_deg from target_cm based on the defined
+//     TURN_RADIUS float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) *
+//     (180.0f / PI);
 
 //     Turn_Car(target_deg, 3000, -45,0);
 // }
 
 // void cmd_turn_left_reverse(float target_cm)
 // {
-//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
+//     // Calculate and override target_deg from target_cm based on the defined
+//     TURN_RADIUS float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) *
+//     (180.0f / PI);
 
 //     Turn_Car_Reverse(target_deg, 3000, -45, 0);
 // }
 
 // void cmd_turn_right(float target_cm)
 // {
-//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
+//     // Calculate and override target_deg from target_cm based on the defined
+//     TURN_RADIUS float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) *
+//     (180.0f / PI);
 
 //     Turn_Car(target_deg, 3000, 45, 0);
 // }
 
 // void cmd_turn_right_reverse(float target_cm)
 // {
-//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
+//     // Calculate and override target_deg from target_cm based on the defined
+//     TURN_RADIUS float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) *
+//     (180.0f / PI);
 
 //     Turn_Car_Reverse(target_deg, 3000, 45, 0);
 // }
@@ -1844,7 +1848,8 @@ void task_two() {
 
   // turn according to picture (arrow)
   if (direction == '<') {
-	Turn_Car(90, speed, -45, 0); // values may be wrong calibrate everything below
+    Turn_Car(90, speed, -45,
+             0); // values may be wrong calibrate everything below
     Drive_Forward_ToCM(5, speed);
     Turn_Car(90, speed, 45, 0);
     Drive_Forward_ToCM(10, speed);
@@ -1852,7 +1857,8 @@ void task_two() {
     Drive_Forward_ToCM(5, speed);
     Turn_Car(90, speed, -45, 0);
   } else if (direction == '>') {
-    Turn_Car(90, speed, 45, 0); // values may be wrong calibrate everything below
+    Turn_Car(90, speed, 45,
+             0); // values may be wrong calibrate everything below
     Drive_Forward_ToCM(5, speed);
     Turn_Car(90, speed, -45, 0);
     Drive_Forward_ToCM(10, speed);
@@ -1870,35 +1876,43 @@ void task_two() {
 
   // turn according to picture (arrow)
   if (direction == '<') {
-    Turn_Car(90, speed, -45, 0); // values may be wrong calibrate everything below
+    Turn_Car(90, speed, -45,
+             0); // values may be wrong calibrate everything below
     float half_horizontal_dist = task_two_forward_ir(speed, direction);
     Turn_Car(90, speed, 45, 0);
     float vertical_dist = task_two_forward_ir(speed, direction);
     Turn_Car(90, speed, 45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist*2, speed); // may be completely off
+    Drive_Forward_ToCM(half_horizontal_dist * 2,
+                       speed); // may be completely off
     Turn_Car(90, speed, 45, 0);
-    
-    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, speed); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
+
+    Drive_Forward_ToCM(
+        vertical_dist + second_dist_travelled + first_dist_travelled + 10,
+        speed); // this vertical distance goes back to the starting position in
+                // the carpark, need to tune so that it stops slightly before
     Turn_Car(90, speed, 45, 0);
     Drive_Forward_ToCM(half_horizontal_dist, speed);
     Turn_Car(90, speed, -45, 0);
 
   } else if (direction == '>') {
-    Turn_Car(90, speed, 45, 0); // values may be wrong calibrate everything below
+    Turn_Car(90, speed, 45,
+             0); // values may be wrong calibrate everything below
     float half_horizontal_dist = task_two_forward_ir(speed, direction);
     Turn_Car(90, speed, -45, 0);
     float vertical_dist = task_two_forward_ir(speed, direction);
     Turn_Car(90, speed, -45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist*2, speed); // may be completely off
+    Drive_Forward_ToCM(half_horizontal_dist * 2,
+                       speed); // may be completely off
     Turn_Car(90, speed, -45, 0);
 
-    Drive_Forward_ToCM(vertical_dist + second_dist_travelled + first_dist_travelled + 10, speed); // this vertical distance goes back to the starting position in the carpark, need to tune so that it stops slightly before
+    Drive_Forward_ToCM(
+        vertical_dist + second_dist_travelled + first_dist_travelled + 10,
+        speed); // this vertical distance goes back to the starting position in
+                // the carpark, need to tune so that it stops slightly before
     Turn_Car(90, speed, -45, 0);
     Drive_Forward_ToCM(half_horizontal_dist, speed);
     Turn_Car(90, speed, 45, 0);
-
   }
-
 }
 
 char task_two_uart() {
@@ -1939,7 +1953,6 @@ char task_two_uart() {
 float task_two_forward_to_obstacle(int speed,
                                    float obstacle_clearance_distance) {
   reset_encoders();
-  
 
   while (1) {
     if (HCSR04_Read() <= obstacle_clearance_distance) {
@@ -1992,9 +2005,7 @@ float task_two_forward_ir(int speed, char direction) {
       }
 
       sprintf(buf, "%.2f", dist7);
-
     }
-
   }
 
   OLED_ShowString(0, 20, (uint8_t *)buf);
@@ -2004,6 +2015,164 @@ float task_two_forward_ir(int speed, char direction) {
   Motor_forward_advanced(speed);
 }
 
+void testing() {
+  // Test Case
+  // Left
+  int angle_dir = -1;
+
+  float quarter_turn_left = 0.25f * TURN_RADIUS_LEFT * 2.0 * PI;
+  float semi_turn_left = 0.50f * TURN_RADIUS_LEFT * 2.0 * PI;
+  float full_turn_left = TURN_RADIUS_LEFT * 2.0 * PI;
+
+  float quarter_turn_right = 0.25 * TURN_RADIUS_RIGHT * 2.0 * PI;
+  float semi_turn_right = 0.50 * TURN_RADIUS_RIGHT * 2.0 * PI;
+  float full_turn_right = TURN_RADIUS_RIGHT * 2.0 * PI;
+
+  int delay_btw_cmds = 2000;
+  int delay_after_cmds = 5000;
+  // Left
+  for (int i = 0; i < 4; ++i) {
+    cmd_turn_left(quarter_turn_left);
+    HAL_Delay(delay_btw_cmds);
+  }
+
+  HAL_Delay(delay_after_cmds);
+
+  for (int i = 0; i < 2; ++i) {
+    cmd_turn_left(semi_turn_left);
+    HAL_Delay(delay_btw_cmds);
+  }
+
+  HAL_Delay(delay_after_cmds);
+
+  for (int i = 0; i < 1; ++i) {
+    cmd_turn_left(full_turn_left);
+    HAL_Delay(delay_btw_cmds);
+  }
+
+  HAL_Delay(delay_after_cmds);
+
+  // Right
+  // angle_dir = 1;
+
+  // for(int i = 0; i < 4; ++i) {
+  //   cmd_turn_right(quarter_turn_right);
+  //   HAL_Delay(delay_btw_cmds);
+  // }
+
+  // HAL_Delay(delay_after_cmds);
+
+  // for(int i = 0; i < 2; ++i) {
+  //   cmd_turn_right(semi_turn_right);
+  //   HAL_Delay(delay_btw_cmds);
+  // }
+
+  // HAL_Delay(delay_after_cmds);
+
+  // for(int i = 0; i < 1; ++i) {
+  //   cmd_turn_right(full_turn_right);
+  //   HAL_Delay(3000);
+  // }
+}
+
+void testing_process_commands() {
+  // Run all accumulated commands in the buffer
+  for (int i = 0; i < cmd_count; i++) {
+    Command c = cmd_array[i];
+
+    if (c.type == 'f') {
+      Drive_Forward_ToCM(c.value, TASK1_PWM);
+    } else if (c.type == 'b') {
+      Drive_Reverse_ToCM(c.value, TASK1_PWM);
+    } else if (c.type == 'l') {
+      if (c.value >= 0) {
+        cmd_turn_left(c.value);
+      } else {
+        cmd_turn_left_reverse(-c.value);
+      }
+    } else if (c.type == 'r') {
+      if (c.value >= 0) {
+        cmd_turn_right(c.value);
+      } else {
+        cmd_turn_right_reverse(-c.value);
+      }
+    } 
+  }
+
+  Motor_stop();
+  HAL_Delay(5000);
+
+  // Clear the command buffer after finishing all commands
+  cmd_count = 0;
+}
+
+static const char *const scripts[] = {
+    "r,30.67\n"
+"f,111.63\n"
+"r,23.15\n"
+"r,23.15\n"
+,
+
+"l,-21.49\n"
+"r,22.06\n"
+"r,22.06\n"
+"l,14.31\n",
+
+"r,35.00\n"
+"r,16.79\n"
+"l,-11.33\n"
+"r,-24.63\n",
+
+"r,35.00\n"
+"r,16.79\n"
+"l,-11.33\n"
+"r,-24.63\n",
+
+"f,5.00\n"
+"l,25.00\n"
+"r,10.00\n"
+"l,11.63\n"
+"f,35.29\n"
+"r,38.48\n"
+"l,-13.80\n"
+
+
+
+
+    // add more...
+};
+
+#define NUM_SCRIPTS (sizeof(scripts) / sizeof(scripts[0]))
+void run_script(const char *script) {
+  char line[CMD_BUF_LEN];
+  size_t line_len = 0;
+  const char *p = script;
+  cmd_count = 0;
+  while (*p) {
+    if (*p == '\n' || *p == '\r') {
+      if (line_len > 0) {
+        line[line_len] = '\0';
+        store_command(line);
+        line_len = 0;
+      }
+      p++;
+      continue;
+    }
+    if (line_len < CMD_BUF_LEN - 1)
+      line[line_len++] = *p;
+    p++;
+  }
+  if (line_len > 0) {
+    line[line_len] = '\0';
+    store_command(line);
+  }
+  testing_process_commands();
+}
+
+void testing_full_obstacle() {
+  for (size_t i = 0; i < NUM_SCRIPTS; i++)
+    run_script(scripts[i]);
+}
 
 /* USER CODE END 0 */
 
@@ -2133,99 +2302,44 @@ int main(void) {
 
   /********************************our testing*** */
 
-  // Test Case
-  // Left
-  int angle_dir = -1;
+  // testing();
 
+  testing_full_obstacle();
 
-  float quarter_turn_left = 0.25f * TURN_RADIUS_LEFT * 2.0 * PI;
-  float semi_turn_left = 0.50f * TURN_RADIUS_LEFT * 2.0 * PI;
-  float full_turn_left = TURN_RADIUS_LEFT * 2.0 * PI;
-
-  float quarter_turn_right = 0.25 * TURN_RADIUS_RIGHT * 2.0 * PI;
-  float semi_turn_right = 0.50 * TURN_RADIUS_RIGHT * 2.0 * PI;
-  float full_turn_right = TURN_RADIUS_RIGHT * 2.0 * PI;
-
-  int delay_btw_cmds = 2000;
-  int delay_after_cmds = 5000;
-  // Left
-  for(int i = 0; i < 4; ++i) {
-    cmd_turn_left(quarter_turn_left);
-    HAL_Delay(delay_btw_cmds);
-  }
-
-  HAL_Delay(delay_after_cmds);
-
-  for(int i = 0; i < 2; ++i) {
-    cmd_turn_left(semi_turn_left);
-    HAL_Delay(delay_btw_cmds);
-  }
-
-  HAL_Delay(delay_after_cmds);
-
-  for(int i = 0; i < 1; ++i) {
-    cmd_turn_left(full_turn_left);
-    HAL_Delay(delay_btw_cmds);
-  }
-
-  HAL_Delay(delay_after_cmds);
-
-  // Right
-  // angle_dir = 1;
-
-  // for(int i = 0; i < 4; ++i) {
-  //   cmd_turn_right(quarter_turn_right);
-  //   HAL_Delay(delay_btw_cmds);
-  // }
-
-  // HAL_Delay(delay_after_cmds);
-
-  // for(int i = 0; i < 2; ++i) {
-  //   cmd_turn_right(semi_turn_right);
-  //   HAL_Delay(delay_btw_cmds);
-  // }
-
-  // HAL_Delay(delay_after_cmds);
-
-  // for(int i = 0; i < 1; ++i) {
-  //   cmd_turn_right(full_turn_right);
-  //   HAL_Delay(3000);
-  // }
-
-
+  return 0;
 
   typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
   SystemState current_state = STATE_RECEIVING;
 
   while (1) {
     if (current_state == STATE_RECEIVING) {
-        // Below section is for the RPI command unloading
-        uint8_t ch;
-        if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
-            if (ch == '\n' || ch == '\r') {
-                if (cmd_index > 0) {
-                    cmd_buf[cmd_index] = '\0';
-                    
-                    // Check if RPI triggered the run
-                    if (strcmp(cmd_buf, "run") == 0) {
-                        current_state = STATE_RUNNING;
-                    } else {
-                        store_command(cmd_buf);
-                    }
-                    cmd_index = 0;
-                }
+      // Below section is for the RPI command unloading
+      uint8_t ch;
+      if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+        if (ch == '\n' || ch == '\r') {
+          if (cmd_index > 0) {
+            cmd_buf[cmd_index] = '\0';
+
+            // Check if RPI triggered the run
+            if (strcmp(cmd_buf, "run") == 0) {
+              current_state = STATE_RUNNING;
             } else {
-                if (cmd_index < CMD_BUF_LEN - 1) {
-                    cmd_buf[cmd_index++] = ch;
-                }
+              store_command(cmd_buf);
             }
+            cmd_index = 0;
+          }
+        } else {
+          if (cmd_index < CMD_BUF_LEN - 1) {
+            cmd_buf[cmd_index++] = ch;
+          }
         }
+      }
     } else if (current_state == STATE_RUNNING) {
-        // Run mode: Execute the array
-        process_commands();
-        
-        // Return to receiving mode once all processing is finished
-        current_state = STATE_RECEIVING;
+      // Run mode: Execute the array
+      process_commands();
+
+      // Return to receiving mode once all processing is finished
+      current_state = STATE_RECEIVING;
     }
   }
 

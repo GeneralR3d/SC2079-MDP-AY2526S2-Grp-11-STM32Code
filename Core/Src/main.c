@@ -2016,6 +2016,8 @@ float task_two_forward_ir(int speed, char direction) {
 }
 
 void testing() {
+
+  HAL_Delay(2000);
   // Test Case
   // Left
   int angle_dir = -1;
@@ -2030,6 +2032,7 @@ void testing() {
 
   int delay_btw_cmds = 2000;
   int delay_after_cmds = 5000;
+  
   // Left
   for (int i = 0; i < 4; ++i) {
     cmd_turn_left(quarter_turn_left);
@@ -2321,9 +2324,9 @@ int main(void) {
 
   /********************************our testing*** */
 
-  // testing();
+   testing();
 
-  testing_full_obstacle();
+  //testing_full_obstacle();
 
   return 0;
 

@@ -45,10 +45,16 @@ const float COUNTS_PER_CM_R_REVERSE = 79.29f;
 volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
-float TURN_RADIUS_RIGHT = 24.5f; // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_LEFT = 24.5f;  // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_RIGHT = 24.40f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT = 24.40f;  // min turning radius (cm) when steering is 45°
+
+// HPL
+// float GYRO_LEFT_BIAS = 131.33f;
+// float GYRO_RIGHT_BIAS = 130.959f;
+
 float GYRO_LEFT_BIAS = 131.33f;
 float GYRO_RIGHT_BIAS = 130.959f;
+
 
 // Ackermann differential steering constants (measure your car!)
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
@@ -2018,6 +2024,16 @@ float task_two_forward_ir(int speed, char direction) {
 void testing() {
 
   HAL_Delay(2000);
+
+  Drive_Forward_ToCM(50.0f, 3000);
+  Motor_stop();
+
+  HAL_Delay(2000);
+
+  Drive_Reverse_ToCM(50.0f, 3000);
+  Motor_stop();
+
+  HAL_Delay(5000);
   // Test Case
   // Left
   int angle_dir = -1;
@@ -2032,7 +2048,7 @@ void testing() {
 
   int delay_btw_cmds = 2000;
   int delay_after_cmds = 5000;
-  
+
   // Left
   for (int i = 0; i < 4; ++i) {
     cmd_turn_left(quarter_turn_left);

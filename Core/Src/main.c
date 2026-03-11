@@ -1593,37 +1593,89 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 }
 
 
+// Bin thresholds (cm)
+#define ARC_BIN_SHORT_MAX 40.0f
+#define ARC_BIN_MID_MAX   60.0f
+// Calibrated bin radii (example values - replace with yours)
+float R_RIGHT_SHORT = 24.5f;
+float R_RIGHT_MID   = 25.5f;
+float R_RIGHT_LONG  = 25.5f;
+
+float R_LEFT_SHORT  = 24.5f;
+float R_LEFT_MID    = 25.5f;
+float R_LEFT_LONG   = 25.5f;
+
+static inline float select_right_radius(float arc_cm_abs) {
+  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_RIGHT_SHORT;
+  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_RIGHT_MID;
+  return R_RIGHT_LONG;
+}
+static inline float select_left_radius(float arc_cm_abs) {
+  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_LEFT_SHORT;
+  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_LEFT_MID;
+  return R_LEFT_LONG;
+}
+
 void cmd_turn_left(float target_cm)
 {
-    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
-
-    Turn_Car(target_deg, 3000, -45,0);
+  float arc = fabsf(target_cm);
+  float R = select_left_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  Turn_Car(target_deg, 3000, -45, 0);
 }
-
-void cmd_turn_left_reverse(float target_cm)
-{
-    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
-
-    Turn_Car_Reverse(target_deg, 3000, -45, 0);
-}
-
 void cmd_turn_right(float target_cm)
 {
-    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
-
-    Turn_Car(target_deg, 3000, 45, 0);
+  float arc = fabsf(target_cm);
+  float R = select_right_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  Turn_Car(target_deg, 3000, 45, 0);
 }
-
+void cmd_turn_left_reverse(float target_cm)
+{
+  float arc = fabsf(target_cm);
+  float R = select_left_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  Turn_Car_Reverse(target_deg, 3000, -45, 0);
+}
 void cmd_turn_right_reverse(float target_cm)
 {
-    // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
-    float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
-
-    Turn_Car_Reverse(target_deg, 3000, 45, 0);
+  float arc = fabsf(target_cm);
+  float R = select_right_radius(arc);
+  float target_deg = (arc / R) * (180.0f / PI);
+  Turn_Car_Reverse(target_deg, 3000, 45, 0);
 }
+
+// void cmd_turn_left(float target_cm)
+// {
+//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
+
+//     Turn_Car(target_deg, 3000, -45,0);
+// }
+
+// void cmd_turn_left_reverse(float target_cm)
+// {
+//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_LEFT) * (180.0f / PI);
+
+//     Turn_Car_Reverse(target_deg, 3000, -45, 0);
+// }
+
+// void cmd_turn_right(float target_cm)
+// {
+//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
+
+//     Turn_Car(target_deg, 3000, 45, 0);
+// }
+
+// void cmd_turn_right_reverse(float target_cm)
+// {
+//     // Calculate and override target_deg from target_cm based on the defined TURN_RADIUS
+//     float target_deg = (fabsf(target_cm) / TURN_RADIUS_RIGHT) * (180.0f / PI);
+
+//     Turn_Car_Reverse(target_deg, 3000, 45, 0);
+// }
 
 void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm) {
   const uint32_t OBSTACLE_THRESHOLD = 20; // 20cm threshold

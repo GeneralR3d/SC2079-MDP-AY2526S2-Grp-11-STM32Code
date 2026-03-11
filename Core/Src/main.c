@@ -2234,6 +2234,8 @@ int main(void) {
     HAL_Delay(3000);
   }
 
+  HAL_Delay(5000);
+
   // Right
   angle_dir = 1;
 

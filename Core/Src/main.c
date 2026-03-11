@@ -1596,53 +1596,54 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 // Bin thresholds (cm)
 #define ARC_BIN_SHORT_MAX 40.0f
 #define ARC_BIN_MID_MAX   60.0f
-// Calibrated bin radii (example values - replace with yours)
-float R_RIGHT_SHORT = 24.5f;
-float R_RIGHT_MID   = 25.5f;
-float R_RIGHT_LONG  = 25.5f;
 
-float R_LEFT_SHORT  = 24.5f;
-float R_LEFT_MID    = 26.0f;
-float R_LEFT_LONG   = 27.0f;
+float D_LEFT_SHORT  = -45.0f;
+float D_LEFT_MID    = -42.5f;
+float D_LEFT_LONG   = -40.0f;
 
-static inline float select_right_radius(float arc_cm_abs) {
-  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_RIGHT_SHORT;
-  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_RIGHT_MID;
-  return R_RIGHT_LONG;
+float D_RIGHT_SHORT  = 45.0f;
+float D_RIGHT_MID    = 45.0f;
+float D_RIGHT_LONG   = 45.0f;
+
+static inline int select_left_steer_angle(float target_cm) {
+  if (target_cm <= ARC_BIN_SHORT_MAX) return D_LEFT_SHORT;
+  if (target_cm <= ARC_BIN_MID_MAX) return D_LEFT_MID;
+  return D_LEFT_LONG;
 }
-static inline float select_left_radius(float arc_cm_abs) {
-  if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_LEFT_SHORT;
-  if (arc_cm_abs <= ARC_BIN_MID_MAX)   return R_LEFT_MID;
-  return R_LEFT_LONG;
+
+static inline int select_right_steer_angle(float target_cm) {
+  if (target_cm <= ARC_BIN_SHORT_MAX) return D_RIGHT_SHORT;
+  if (target_cm <= ARC_BIN_MID_MAX) return D_RIGHT_MID;
+  return D_RIGHT_LONG;
 }
 
 void cmd_turn_left(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float R = select_left_radius(arc);
-  float target_deg = (arc / R) * (180.0f / PI);
-  Turn_Car(target_deg, 3000, -45, 0);
+  float target_deg = (arc / TURN_RADIUS_LEFT) * (180.0f / PI);
+  int steer_angle = select_left_steer_angle(target_cm);
+  Turn_Car(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_right(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float R = select_right_radius(arc);
-  float target_deg = (arc / R) * (180.0f / PI);
-  Turn_Car(target_deg, 3000, 45, 0);
+  float target_deg = (arc / TURN_RADIUS_RIGHT) * (180.0f / PI);
+  int steer_angle = select_right_steer_angle(target_cm);
+  Turn_Car(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_left_reverse(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float R = select_left_radius(arc);
-  float target_deg = (arc / R) * (180.0f / PI);
-  Turn_Car_Reverse(target_deg, 3000, -45, 0);
+  float target_deg = (arc / TURN_RADIUS_LEFT) * (180.0f / PI);
+  int steer_angle = select_left_steer_angle(target_cm);
+  Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_right_reverse(float target_cm)
 {
   float arc = fabsf(target_cm);
-  float R = select_right_radius(arc);
-  float target_deg = (arc / R) * (180.0f / PI);
-  Turn_Car_Reverse(target_deg, 3000, 45, 0);
+  float target_deg = (arc / TURN_RADIUS_RIGHT) * (180.0f / PI);
+  int steer_angle = select_right_steer_angle(target_cm);
+  Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
 }
 
 // void cmd_turn_left(float target_cm)

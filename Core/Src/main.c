@@ -2021,19 +2021,44 @@ float task_two_forward_ir(int speed, char direction) {
   Motor_forward_advanced(speed);
 }
 
-void testing() {
+void front_back_test() {
+  int delay_btw_front_back = 5000;
+  int delay_after_front_back = 8000;
 
   HAL_Delay(2000);
 
-  Drive_Forward_ToCM(50.0f, 3000);
+  int front_back_distance = 50.0f;
+
+  Drive_Forward_ToCM(front_back_distance, 3000);
   Motor_stop();
 
-  HAL_Delay(2000);
+  HAL_Delay(delay_btw_front_back);
 
-  Drive_Reverse_ToCM(50.0f, 3000);
+  Drive_Reverse_ToCM(front_back_distance, 3000);
   Motor_stop();
 
-  HAL_Delay(5000);
+  HAL_Delay(delay_after_front_back);
+
+  front_back_distance = 100.0f;
+
+  Drive_Forward_ToCM(front_back_distance, 3000);
+  Motor_stop();
+
+  HAL_Delay(delay_btw_front_back);
+
+  Drive_Reverse_ToCM(front_back_distance, 3000);
+  Motor_stop();
+
+  HAL_Delay(delay_after_front_back);
+}
+
+
+
+void turning_test() {
+
+
+
+
   // Test Case
   // Left
   int angle_dir = -1;
@@ -2092,6 +2117,11 @@ void testing() {
   //   cmd_turn_right(full_turn_right);
   //   HAL_Delay(3000);
   // }
+}
+
+void testing() {
+  front_back_test();
+  //turning_test();
 }
 
 void testing_process_commands() {

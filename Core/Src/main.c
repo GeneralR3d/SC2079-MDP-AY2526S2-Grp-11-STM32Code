@@ -1041,13 +1041,13 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     // Motor_forward_advanced(pwm); // feb 23
 
     // Display progress
-    // snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    // OLED_ShowString(0, 10, (uint8_t*)buf);
-    // // show left encoder ticks for debugging
-    // int32_t l = left_ticks_forward();
-    // int32_t r = right_ticks_forward();
-    // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    // OLED_ShowString(0, 20, (uint8_t*)buf);
+    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    OLED_ShowString(0, 10, (uint8_t*)buf);
+    // show left encoder ticks for debugging
+    int32_t l = left_ticks_forward();
+    int32_t r = right_ticks_forward();
+    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    OLED_ShowString(0, 20, (uint8_t*)buf);
 
     OLED_Refresh_Gram();
 
@@ -1092,13 +1092,13 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     Motor_reverse(pwm);
 
     // Display progress
-    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 10, (uint8_t *)buf);
+    snprintf(buf, sizeof(buf), "R Dist: %.1f/%.1fcm", cm_now, target_cm);
+    OLED_ShowString(0, 30, (uint8_t *)buf);
     // // show left encoder ticks for debugging
     int32_t l = left_ticks_reverse();
     int32_t r = right_ticks_reverse();
-    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    OLED_ShowString(0, 20, (uint8_t *)buf);
+    snprintf(buf, sizeof(buf), "R -> L:%ld R:%ld", (long)l, (long)r);
+    OLED_ShowString(0, 40, (uint8_t *)buf);
 
     // Display progress
     // snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);

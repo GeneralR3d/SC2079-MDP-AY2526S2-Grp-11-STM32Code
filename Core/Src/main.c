@@ -1602,8 +1602,8 @@ float R_RIGHT_MID   = 25.5f;
 float R_RIGHT_LONG  = 25.5f;
 
 float R_LEFT_SHORT  = 24.5f;
-float R_LEFT_MID    = 25.5f;
-float R_LEFT_LONG   = 25.5f;
+float R_LEFT_MID    = 26.0f;
+float R_LEFT_LONG   = 27.0f;
 
 static inline float select_right_radius(float arc_cm_abs) {
   if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_RIGHT_SHORT;
@@ -2209,6 +2209,54 @@ int main(void) {
   // Turn_Car(380.0f, 1500, -45,0);
   // Continuous_Complex_Obstacle_Avoidance(3000, 2500);
   // Turn_Car(-180.0f, 2500, -40,0);
+
+  // Test Case
+
+  // Left
+  int angle_dir = -1;
+  
+  for(int i = 0; i < 4; ++i) {
+    Turn_Car(90.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(3000);
+  }
+
+  HAL_Delay(5000);
+
+  for(int i = 0; i < 2; ++i) {
+    Turn_Car(180.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(3000);
+  }
+
+  HAL_Delay(5000);
+
+  for(int i = 0; i < 1; ++i) {
+    Turn_Car(360.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(3000);
+  }
+
+  // Right
+  angle_dir = 1;
+
+  for(int i = 0; i < 4; ++i) {
+    Turn_Car(90.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(3000);
+  }
+
+  HAL_Delay(5000);
+
+  for(int i = 0; i < 2; ++i) {
+    Turn_Car(180.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(3000);
+  }
+
+  HAL_Delay(5000);
+
+  for(int i = 0; i < 1; ++i) {
+    Turn_Car(360.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(3000);
+  }
+
+
 
   typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
   SystemState current_state = STATE_RECEIVING;

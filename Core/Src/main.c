@@ -47,8 +47,8 @@ volatile int32_t SERVO_CENTER_US = 1477;
 // 1480 is right
 float TURN_RADIUS_RIGHT = 24.5f; // min turning radius (cm) when steering is 45°
 float TURN_RADIUS_LEFT = 24.5f; // min turning radius (cm) when steering is 45°
-float GYRO_LEFT_BIAS = 133.18f;
-float GYRO_RIGHT_BIAS = 129.52f;
+float GYRO_LEFT_BIAS = 131.33f;
+float GYRO_RIGHT_BIAS = 130.959f;
 
 // Ackermann differential steering constants (measure your car!)
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
@@ -1299,7 +1299,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
   last_time = HAL_GetTick();
   uint32_t start_time = HAL_GetTick();
   uint32_t last_slow_tick = 0;
-  const uint32_t timeout_ms = 8000;
+  const uint32_t timeout_ms = 150000;
 
   while (1) {
     uint32_t loop_tick = HAL_GetTick();
@@ -1326,6 +1326,19 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     // NOTE: Update_Yaw() already integrates (gz - gyro_z_bias).
     // DO NOT subtract bias again here.
 
+    // Calculate Ackermann ratio first to determine minimum safe outer wheel speed
+    float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
+    float ratio = 1.0f;
+    if (steer_rad > 0.01f) { // avoid division by zero for near-straight
+      float R_inner = WHEELBASE_CM / tanf(steer_rad);
+      float R_outer = R_inner + TRACK_WIDTH_CM;
+      ratio = R_inner / R_outer; // < 1.0
+    }
+
+    // Determine the absolute lowest speed the outer wheel can go 
+    // while keeping the inner wheel at or above pwmMin
+    int min_allowed_pwm = (ratio > 0.01f) ? (int)(pwmMin / ratio) : pwmMin;
+
     // Drive with controlled speed (reduce speed as we approach target)
     float angle_progress =
         (target_deg_abs > 0.0f) ? abs_yaw / target_deg_abs : 0.0f;
@@ -1340,23 +1353,23 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     int current_pwm = pwmVal;
 
     if (progress > 0.95f) {
-      current_pwm = pwmMin; // Final crawl
+      current_pwm = min_allowed_pwm; // Final crawl
     } else if (progress > 0.85f) {
       current_pwm = (int)(pwmVal * 0.3f);
     } else if (progress > 0.7f) {
       current_pwm = (int)(pwmVal * 0.6f);
     }
 
+    // Enforce the dynamic minimum PWM to preserve Ackermann 
+    if (current_pwm < min_allowed_pwm) {
+      current_pwm = min_allowed_pwm;
+    }
+
     // --- Ackermann differential: slow the inner wheel ---
     int pwm_left = current_pwm;
     int pwm_right = current_pwm;
 
-    float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
-    if (steer_rad > 0.01f) { // avoid division by zero for near-straight
-      float R_inner = WHEELBASE_CM / tanf(steer_rad);
-      float R_outer = R_inner + TRACK_WIDTH_CM;
-      float ratio = R_inner / R_outer; // < 1.0
-
+    if (ratio < 1.0f) {
       int pwm_inner = (int)(current_pwm * ratio);
       if (pwm_inner < pwmMin)
         pwm_inner = pwmMin;
@@ -1372,18 +1385,18 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
 
     // pwm clamping
     if (pwm_left < pwmMin)
-      pwm_left = pwmMin;
+    pwm_left = pwmMin;
     if (pwm_left > pwmMax)
-      pwm_left = pwmMax;
+    pwm_left = pwmMax;
     if (pwm_right < pwmMin)
-      pwm_right = pwmMin;
+    pwm_right = pwmMin;
     if (pwm_right > pwmMax)
-      pwm_right = pwmMax;
+    pwm_right = pwmMax;
 
     Motor_forward_simple(pwm_left, pwm_right);
 
     // Run non-critical slow tasks (US sensor, OLED) only every 50ms
-    // if (loop_tick - last_slow_tick > 50) {
+    if (loop_tick - last_slow_tick > 50) {
     //   last_slow_tick = loop_tick;
     //   if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
     //     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
@@ -1391,7 +1404,12 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     //     HAL_Delay(1000);
     //     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
     //     // break;
-    //   }
+      snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f", abs_yaw,
+               target_deg_abs, cm_now, target_cm_abs);
+      OLED_ShowString(0, 30, (uint8_t *)buf);
+      OLED_Refresh_Gram();
+
+    }
 
       // Debug output
       //            if (use_distance) {
@@ -1401,10 +1419,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
       //            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°",
       //            yaw_angle, target_deg_abs);
       //            }
-      snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f", abs_yaw,
-               target_deg_abs, cm_now, target_cm_abs);
-      OLED_ShowString(0, 30, (uint8_t *)buf);
-      OLED_Refresh_Gram();
+
     // }
 
     HAL_Delay(5); // Faster loop frequency (200Hz)
@@ -1495,6 +1510,19 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
     // NOTE: Update_Yaw() already integrates (gz - gyro_z_bias).
     // DO NOT subtract bias again here.
 
+    // Calculate Ackermann ratio first to determine minimum safe outer wheel speed
+    float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
+    float ratio = 1.0f;
+    if (steer_rad > 0.01f) { // avoid division by zero for near-straight
+      float R_inner = WHEELBASE_CM / tanf(steer_rad);
+      float R_outer = R_inner + TRACK_WIDTH_CM;
+      ratio = R_inner / R_outer; // < 1.0
+    }
+
+    // Determine the absolute lowest speed the outer wheel can go 
+    // while keeping the inner wheel at or above pwmMin
+    int min_allowed_pwm = (ratio > 0.01f) ? (int)(pwmMin / ratio) : pwmMin;
+
     // Drive with controlled speed (reduce speed as we approach target)
     float angle_progress =
         (target_deg_abs > 0.0f) ? abs_yaw / target_deg_abs : 0.0f;
@@ -1509,23 +1537,23 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
     int current_pwm = pwmVal;
 
     if (progress > 0.95f) {
-      current_pwm = pwmMin; // Final crawl
+      current_pwm = min_allowed_pwm; // Final crawl
     } else if (progress > 0.85f) {
       current_pwm = (int)(pwmVal * 0.3f);
     } else if (progress > 0.7f) {
       current_pwm = (int)(pwmVal * 0.6f);
     }
 
+    // Enforce the dynamic minimum PWM to preserve Ackermann 
+    if (current_pwm < min_allowed_pwm) {
+      current_pwm = min_allowed_pwm;
+    }
+
     // --- Ackermann differential: slow the inner wheel ---
     int pwm_left = current_pwm;
     int pwm_right = current_pwm;
 
-    float steer_rad = fabsf((float)steer_angle) * PI / 180.0f;
-    if (steer_rad > 0.02f) { // avoid division by zero for near-straight
-      float R_inner = WHEELBASE_CM / tanf(steer_rad);
-      float R_outer = R_inner + TRACK_WIDTH_CM;
-      float ratio = R_inner / R_outer; // < 1.0
-
+    if (ratio < 1.0f) {
       int pwm_inner = (int)(current_pwm * ratio);
       if (pwm_inner < pwmMin)
         pwm_inner = pwmMin;
@@ -2146,7 +2174,12 @@ int main(void) {
 
   // HAL_Delay(10000);
   // cmd_turn_left(90.0f, pwmMin, 60.0f);
-  Turn_Car(360.0f, 3000, 45,0);
+    Turn_Car(360.0f, 3000, -45,0);
+  HAL_Delay(8000);
+    Turn_Car(360.0f, 3000, 45,0);
+
+
+
   
   // HAL_Delay(10000);
 

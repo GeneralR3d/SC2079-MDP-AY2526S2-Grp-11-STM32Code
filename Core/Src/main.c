@@ -47,8 +47,8 @@ volatile int32_t SERVO_CENTER_US = 1477;
 // 1480 is right
 float TURN_RADIUS_RIGHT = 24.5f; // min turning radius (cm) when steering is 45°
 float TURN_RADIUS_LEFT = 24.5f; // min turning radius (cm) when steering is 45°
-float GYRO_LEFT_BIAS = 133.18f;
-float GYRO_RIGHT_BIAS = 129.52f;
+float GYRO_LEFT_BIAS = 131.33f;
+float GYRO_RIGHT_BIAS = 130.959f;
 
 // Ackermann differential steering constants (measure your car!)
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
@@ -1371,14 +1371,14 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     }
 
     // pwm clamping
-    if (pwm_left < pwmMin)
-      pwm_left = pwmMin;
-    if (pwm_left > pwmMax)
-      pwm_left = pwmMax;
-    if (pwm_right < pwmMin)
-      pwm_right = pwmMin;
-    if (pwm_right > pwmMax)
-      pwm_right = pwmMax;
+    // if (pwm_left < pwmMin)
+    //   pwm_left = pwmMin;
+    // if (pwm_left > pwmMax)
+    //   pwm_left = pwmMax;
+    // if (pwm_right < pwmMin)
+    //   pwm_right = pwmMin;
+    // if (pwm_right > pwmMax)
+    //   pwm_right = pwmMax;
 
     Motor_forward_simple(pwm_left, pwm_right);
 
@@ -2146,7 +2146,11 @@ int main(void) {
 
   // HAL_Delay(10000);
   // cmd_turn_left(90.0f, pwmMin, 60.0f);
-  Turn_Car(360.0f, 3000, 45,0);
+  Turn_Car(180.0f, 3000, -45,0);
+  HAL_Delay(5000);
+    Turn_Car(180.0f, 3000, -45,0);
+    HAL_Delay(5000);
+    Turn_Car(360.0f, 3000, -45,0);
   
   // HAL_Delay(10000);
 

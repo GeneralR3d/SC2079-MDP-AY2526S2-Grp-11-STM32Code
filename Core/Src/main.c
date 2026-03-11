@@ -2081,180 +2081,68 @@ int main(void) {
 
   /********************************our testing*** */
 
-//  Turn_Car(90, 3000, 45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, 45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, 45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, 45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, -45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, -45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, -45, 0);
-//  HAL_Delay(10000);
-//  Turn_Car(90, 3000, -45, 0);
-//
-//  Turn_Car(90, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(30, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(30, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(30, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 3000, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 3000, 45, 0);
-//
-//
-//  HAL_Delay(20000);
-//
-//  Turn_Car(90, 3000, 45, 0);
-//  Turn_Car(45, 3000, 45, 0);
-//  Turn_Car(45, 3000, 45, 0);
-//  Turn_Car(30, 3000, 45, 0);
-//  Turn_Car(30, 3000, 45, 0);
-//  Turn_Car(30, 3000, 45, 0);
-//  Turn_Car(45, 3000, 45, 0);
-//  Turn_Car(45, 3000, 45, 0);
-//
-//
-//
-//  Turn_Car(90, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(30, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(30, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(30, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 1500, 45, 0);
-//  HAL_Delay(5000);
-//  Turn_Car(45, 1500, 45, 0);
-//
-//
-//  HAL_Delay(20000);
-//
-//  Turn_Car(90, 1500, 45, 0);
-//  Turn_Car(45, 1500, 45, 0);
-//  Turn_Car(45, 1500, 45, 0);
-//  Turn_Car(30, 1500, 45, 0);
-//  Turn_Car(30, 1500, 45, 0);
-//  Turn_Car(30, 1500, 45, 0);
-//  Turn_Car(45, 1500, 45, 0);
-//  Turn_Car(45, 1500, 45, 0);
-//
-//
-
-
-
-
-  
-  //// Path 1: Obstacle at (70, 70) face L
-  // cmd_turn_left(40, 3000, 3.86);
-  // Drive_Forward_ToCM(28.65, 3000);
-  // cmd_turn_right(40, 3000, 43.13);
-  // HAL_Delay(3000);
-  //
-  //// Path 2: Obstacle at (70, 70) face D
-  // Drive_Reverse_ToCM(15.0, 3000);
-  // cmd_turn_left_reverse(40, 3000, 15.0);
-  // cmd_turn_right(40, 3000, 20.68);
-  // Drive_Forward_ToCM(26.16, 3000);
-  // cmd_turn_left(40, 3000, 74.95);
-  // HAL_Delay(3000);
-  //
-  //// Path 3: Obstacle at (70, 70) face R
-  // Drive_Reverse_ToCM(15.0, 3000);
-  // cmd_turn_left_reverse(40, 3000, 15.0);
-  // cmd_turn_right(40, 3000, 20.68);
-  // Drive_Forward_ToCM(26.16, 3000);
-  // cmd_turn_left(40, 3000, 74.95);
-  // HAL_Delay(3000);
-  //
-  //// Path 4: Obstacle at (70, 70) face U
-  // Drive_Reverse_ToCM(15.0, 3000);
-  // cmd_turn_left_reverse(40, 3000, 15.0);
-  // cmd_turn_right(40, 3000, 20.68);
-  // Drive_Forward_ToCM(26.16, 3000);
-  // cmd_turn_left(40, 3000, 74.95);
-  // HAL_Delay(3000);
-  //
-  //
-  //
-  //
-  //
-
-  // HAL_Delay(10000);
-  // cmd_turn_left(90.0f, pwmMin, 60.0f);
-  Turn_Car(180.0f, 3000, -45,0);
-  HAL_Delay(5000);
-    Turn_Car(180.0f, 3000, -45,0);
-    HAL_Delay(5000);
-    Turn_Car(360.0f, 3000, -45,0);
-  
-  // HAL_Delay(10000);
-
-  // Turn_Car(380.0f, 1500, -45,0);
-  // Continuous_Complex_Obstacle_Avoidance(3000, 2500);
-  // Turn_Car(-180.0f, 2500, -40,0);
-
   // Test Case
-
   // Left
   int angle_dir = -1;
-  
+
+
+  float quarter_turn_left = 0.25 * TURN_RADIUS_LEFT * 2.0 * PI;
+  float semi_turn_left = 0.50 * TURN_RADIUS_LEFT * 2.0 * PI;
+  float full_turn_left = TURN_RADIUS_LEFT * 2.0 * PI;
+
+  float quarter_turn_right = 0.25 * TURN_RADIUS_RIGHT * 2.0 * PI;
+  float semi_turn_right = 0.50 * TURN_RADIUS_RIGHT * 2.0 * PI;
+  float full_turn_right = TURN_RADIUS_RIGHT * 2.0 * PI;
+
+  int delay_btw_cmds = 2000;
+  int delay_after_cmds = 5000;
+  // Left
   for(int i = 0; i < 4; ++i) {
-    Turn_Car(90.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(3000);
+    cmd_turn_left(quarter_turn_left);
+    //Turn_Car(90.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(delay_btw_cmds);
   }
 
-  HAL_Delay(5000);
+  HAL_Delay(delay_after_cmds);
 
   for(int i = 0; i < 2; ++i) {
-    Turn_Car(180.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(3000);
+    //Turn_Car(180.0f, 3000, angle_dir * 45, 0);
+    cmd_turn_left(semi_turn_left);
+    HAL_Delay(delay_btw_cmds);
   }
 
-  HAL_Delay(5000);
+  HAL_Delay(delay_after_cmds);
 
   for(int i = 0; i < 1; ++i) {
-    Turn_Car(360.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(3000);
+    cmd_turn_left(full_turn_left);
+    //Turn_Car(360.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(delay_btw_cmds);
   }
 
-  HAL_Delay(5000);
+  HAL_Delay(delay_after_cmds);
 
   // Right
   angle_dir = 1;
 
   for(int i = 0; i < 4; ++i) {
-    Turn_Car(90.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(3000);
+    cmd_turn_right(quarter_turn_right);
+    //Turn_Car(90.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(delay_btw_cmds);
   }
 
-  HAL_Delay(5000);
+  HAL_Delay(delay_after_cmds);
 
   for(int i = 0; i < 2; ++i) {
-    Turn_Car(180.0f, 3000, angle_dir * 45, 0);
-    HAL_Delay(3000);
+    cmd_turn_right(semi_turn_right);
+    //Turn_Car(180.0f, 3000, angle_dir * 45, 0);
+    HAL_Delay(delay_btw_cmds);
   }
 
-  HAL_Delay(5000);
+  HAL_Delay(delay_after_cmds);
 
   for(int i = 0; i < 1; ++i) {
-    Turn_Car(360.0f, 3000, angle_dir * 45, 0);
+    cmd_turn_right(full_turn_right);
+    //Turn_Car(360.0f, 3000, angle_dir * 45, 0);
     HAL_Delay(3000);
   }
 

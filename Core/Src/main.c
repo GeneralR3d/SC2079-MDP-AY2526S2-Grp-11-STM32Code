@@ -1598,14 +1598,15 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 #define ARC_BIN_MID_MAX   60.0f
 
 
-// LEFT STEER ANGLES
+// OBSTACLE SET UP CONST
+
 float STEER_ANGLE_LEFT_SHORT  = -45.0f;
-float STEER_ANGLE_LEFT_MID    = -42.5f;
-float STEER_ANGLE_LEFT_LONG   = -42.0f;
+float STEER_ANGLE_LEFT_MID    = -45.0f;
+float STEER_ANGLE_LEFT_LONG   = -45.0f;
 
 float R_LEFT_SHORT  = 24.5f;
-float R_LEFT_MID    = 25.0f;
-float R_LEFT_LONG   = 27.5f;
+float R_LEFT_MID    = 24.5f;
+float R_LEFT_LONG   = 24.5f;
 
 // RIGHT
 
@@ -1616,6 +1617,27 @@ float STEER_ANGLE_RIGHT_LONG   = 45.0f;
 float R_RIGHT_SHORT  = 24.5f;
 float R_RIGHT_MID    = 24.5f;
 float R_RIGHT_LONG  = 24.5f;
+
+
+
+// LEFT STEER ANGLES
+// float STEER_ANGLE_LEFT_SHORT  = -45.0f;
+// float STEER_ANGLE_LEFT_MID    = -42.5f;
+// float STEER_ANGLE_LEFT_LONG   = -42.0f;
+
+// float R_LEFT_SHORT  = 24.5f;
+// float R_LEFT_MID    = 25.0f;
+// float R_LEFT_LONG   = 27.5f;
+
+// // RIGHT
+
+// float STEER_ANGLE_RIGHT_SHORT  = 45.0f;
+// float STEER_ANGLE_RIGHT_MID    = 45.0f;
+// float STEER_ANGLE_RIGHT_LONG   = 45.0f;
+
+// float R_RIGHT_SHORT  = 24.5f;
+// float R_RIGHT_MID    = 24.5f;
+// float R_RIGHT_LONG  = 24.5f;
 
 static inline float select_right_radius(float arc_cm_abs) {
   if (arc_cm_abs <= ARC_BIN_SHORT_MAX) return R_RIGHT_SHORT;

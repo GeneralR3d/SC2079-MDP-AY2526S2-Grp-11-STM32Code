@@ -45,8 +45,10 @@ const float COUNTS_PER_CM_R_REVERSE = 74.89f;
 volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
-float TURN_RADIUS_RIGHT = 24.40f; // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_LEFT = 24.40f;  // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_RIGHT = 25.5f; // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT = 24.5f;  // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT_REVERSE = 23.87f;
+float TURN_RADIUS_RIGHT_REVERSE = 23.87f;
 
 // HPL
 // float GYRO_LEFT_BIAS = 131.33f;
@@ -1697,14 +1699,14 @@ void cmd_turn_right(float target_cm) {
 }
 void cmd_turn_left_reverse(float target_cm) {
   float arc = fabsf(target_cm);
-  float R = select_left_radius(arc);
+  float R = TURN_RADIUS_LEFT_REVERSE;
   float target_deg = (arc / R) * (180.0f / PI);
   int steer_angle = select_left_steer_angle(arc);
   Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
 }
 void cmd_turn_right_reverse(float target_cm) {
   float arc = fabsf(target_cm);
-  float R = select_right_radius(arc);
+  float R = TURN_RADIUS_RIGHT_REVERSE;
   float target_deg = (arc / R) * (180.0f / PI);
   int steer_angle = select_right_steer_angle(arc);
   Turn_Car_Reverse(target_deg, 3000, steer_angle, 0);
@@ -2132,7 +2134,9 @@ void testing() {
 //	Drive_Forward_ToCM(50, TASK1_PWM);
 //	HAL_Delay(10000);
 //	Drive_Reverse_ToCM(5, TASK1_PWM);
-//	Turn_Car_Reverse(10,3000,-45,0);
+//	Turn_Car_Reverse(90,3000,-45,0);
+//	HAL_Delay(10000);
+//	Turn_Car_Reverse(90,3000,45,0);
 //	Turn_Car(90,3000,45,0);
 //	Drive_Forward_ToCM(50, TASK1_PWM);
 //	Drive_Forward_ToCM(25, TASK1_PWM);

@@ -45,8 +45,8 @@ const float COUNTS_PER_CM_R_REVERSE = 74.89f;
 volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
-float TURN_RADIUS_RIGHT = 25.5f; // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_LEFT = 24.5f;  // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_LEFT = 24.75f;  // min turning radius (cm) when steering is 45°
+float TURN_RADIUS_RIGHT = 24.75f; // min turning radius (cm) when steering is 45°
 float TURN_RADIUS_LEFT_REVERSE = 23.87f;
 float TURN_RADIUS_RIGHT_REVERSE = 23.87f;
 
@@ -2129,15 +2129,10 @@ void turning_test() {
 }
 
 void testing() {
+  // Turn_Car_Reverse(90,3000,45,0);
+  // HAL_Delay(10000);
+  // Turn_Car_Reverse(90,3000,-45,0);
 	//Drive_Reverse_ToCM(100, TASK1_PWM);
-//	Drive_Forward_ToCM(50, TASK1_PWM);
-//	Drive_Forward_ToCM(50, TASK1_PWM);
-//	HAL_Delay(10000);
-//	Drive_Reverse_ToCM(5, TASK1_PWM);
-//	Turn_Car_Reverse(90,3000,-45,0);
-//	HAL_Delay(10000);
-//	Turn_Car_Reverse(90,3000,45,0);
-//	Turn_Car(90,3000,45,0);
 //	Drive_Forward_ToCM(50, TASK1_PWM);
 //	Drive_Forward_ToCM(25, TASK1_PWM);
   //front_back_test();

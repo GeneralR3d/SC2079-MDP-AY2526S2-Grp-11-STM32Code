@@ -456,7 +456,7 @@ void Motor_forward(int pwmVal) {
 
   // --- Filter gyro Z-axis (yaw rate) ---
   float alpha =
-      0.1f; // weight of NEW value: lower = more smoothing, higher = faster
+      0.6f; // weight of NEW value: lower = more smoothing, higher = faster
   gz_filtered = alpha * gz_dps + (1.0f - alpha) * gz_filtered;
 
   // --- Update heading from filtered gyro ---
@@ -484,22 +484,23 @@ void Motor_forward(int pwmVal) {
     correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-  int left_offset = 0;
-  int right_offset = -100;
+  int left_offset = -350;
+  //int right_offset = -300;
+  int right_offset = 0;
 
   // --- Apply correction + offsets ---
   int left_pwm = pwmVal + left_offset + correction;
   int right_pwm = pwmVal + right_offset - correction;
 
   // Clamp to valid PWM range
-  if (left_pwm > pwmMax)
-    left_pwm = pwmMax;
-  if (left_pwm < pwmMin)
-    left_pwm = pwmMin;
-  if (right_pwm > pwmMax)
-    right_pwm = pwmMax;
-  if (right_pwm < pwmMin)
-    right_pwm = pwmMin;
+  // if (left_pwm > pwmMax)
+  //   left_pwm = pwmMax;
+  // if (left_pwm < pwmMin)
+  //   left_pwm = pwmMin;
+  // if (right_pwm > pwmMax)
+  //   right_pwm = pwmMax;
+  // if (right_pwm < pwmMin)
+  //   right_pwm = pwmMin;
 
   // --- Send to motors ---
   // Motor A (left)
@@ -570,7 +571,7 @@ void Motor_reverse(int pwmVal) {
 
   // --- Motor offset compensation (baseline bias) ---
   int left_offset = 0;
-  int right_offset = -100;
+  int right_offset = -75;
 
   // --- Apply correction + offsets ---
   int left_pwm = pwmVal + left_offset - correction;
@@ -1038,7 +1039,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
     Motor_forward(pwm); // feb 23
     // Motor_forward_simple(pwm);
-    // Motor_forward_advanced(pwm); // feb 23
+//     Motor_forward_advanced(pwm); // feb 23
 
     // Display progress
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1057,6 +1058,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   Motor_reverse_simple(1000, 1000);
   HAL_Delay(50);
   Motor_stop();
+  HAL_Delay(1000);
 }
 
 void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
@@ -1088,7 +1090,7 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     if (pwm < pwmMin)
       pwm = pwmMin;
 
-    // Motor_reverse_advanced(pwm);
+//     Motor_reverse_advanced(pwm);
     Motor_reverse(pwm);
 
     // Display progress
@@ -1108,6 +1110,7 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
   Motor_forward_simple(1000, 1000);
   HAL_Delay(50);
   Motor_stop();
+  HAL_Delay(1000);
 }
 
 void Drive_Forward_Until_Obstacle(int base_pwm,
@@ -2120,7 +2123,19 @@ void turning_test() {
 }
 
 void testing() {
-  front_back_test();
+	//Drive_Reverse_ToCM(100, TASK1_PWM);
+//	Drive_Forward_ToCM(50, TASK1_PWM);
+//	Drive_Forward_ToCM(50, TASK1_PWM);
+//	HAL_Delay(10000);
+//	Drive_Forward_ToCM(100, TASK1_PWM);
+	Turn_Car(30,3000,-45,0);
+//	HAL_Delay(10000);
+//	Turn_Car(12.5,3000,45,0);
+
+//
+//	Drive_Forward_ToCM(50, TASK1_PWM);
+//	Drive_Forward_ToCM(25, TASK1_PWM);
+  //front_back_test();
   //turning_test();
 }
 
@@ -2374,7 +2389,7 @@ int main(void) {
 
   //testing_full_obstacle();
 
-  return 0;
+//  return 0;
 
   typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
   SystemState current_state = STATE_RECEIVING;

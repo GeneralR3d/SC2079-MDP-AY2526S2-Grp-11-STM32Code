@@ -38,8 +38,8 @@ static int PWM_TRIM_REVERSE =
 const float COUNTS_PER_CM_L = 73.7f;
 const float COUNTS_PER_CM_R = 77.5f;
 
-const float COUNTS_PER_CM_L_REVERSE = 78.17f;
-const float COUNTS_PER_CM_R_REVERSE = 79.29f;
+const float COUNTS_PER_CM_L_REVERSE = 74.73f;
+const float COUNTS_PER_CM_R_REVERSE = 74.89f;
 
 // Global servo center position (can be tweaked)
 volatile int32_t SERVO_CENTER_US = 1477;
@@ -240,14 +240,18 @@ void process_commands(void) {
     } else if (c.type == 'l') {
       if (c.value >= 0) {
         cmd_turn_left(c.value);
+        HAL_Delay(1000);
       } else {
         cmd_turn_left_reverse(-c.value);
+        HAL_Delay(1000);
       }
     } else if (c.type == 'r') {
       if (c.value >= 0) {
         cmd_turn_right(c.value);
+        HAL_Delay(1000);
       } else {
         cmd_turn_right_reverse(-c.value);
+        HAL_Delay(1000);
       }
     } else if (c.type == 'k') {
       // KACHAA command exactly as requested
@@ -1099,7 +1103,7 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     // // show left encoder ticks for debugging
     int32_t l = left_ticks_reverse();
     int32_t r = right_ticks_reverse();
-    snprintf(buf, sizeof(buf), "R -> L:%ld R:%ld", (long)l, (long)r);
+    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
     OLED_ShowString(0, 40, (uint8_t *)buf);
 
     // Display progress
@@ -1478,7 +1482,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
   last_time = HAL_GetTick();
   uint32_t start_time = HAL_GetTick();
   uint32_t last_slow_tick = 0;
-  const uint32_t timeout_ms = 60000;
+  const uint32_t timeout_ms = 8000;
 
   while (1) {
     uint32_t loop_tick = HAL_GetTick();
@@ -2127,12 +2131,9 @@ void testing() {
 //	Drive_Forward_ToCM(50, TASK1_PWM);
 //	Drive_Forward_ToCM(50, TASK1_PWM);
 //	HAL_Delay(10000);
-//	Drive_Forward_ToCM(100, TASK1_PWM);
-	Turn_Car(30,3000,-45,0);
-//	HAL_Delay(10000);
-//	Turn_Car(12.5,3000,45,0);
-
-//
+//	Drive_Reverse_ToCM(5, TASK1_PWM);
+//	Turn_Car_Reverse(10,3000,-45,0);
+//	Turn_Car(90,3000,45,0);
 //	Drive_Forward_ToCM(50, TASK1_PWM);
 //	Drive_Forward_ToCM(25, TASK1_PWM);
   //front_back_test();

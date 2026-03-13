@@ -1536,56 +1536,6 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 }
 
 
-void Continuous_Complex_Obstacle_Avoidance(int forward_pwm, int turn_pwm) {
-  const uint32_t OBSTACLE_THRESHOLD = 20; // 20cm threshold
-
-  while (1) {
-    // Safety check on obstacle threshold
-    uint32_t obstacle_threshold = OBSTACLE_THRESHOLD;
-    if (obstacle_threshold < 5)
-      obstacle_threshold = 5; // Minimum 5cm safety
-    if (obstacle_threshold > 50)
-      obstacle_threshold = 50; // Maximum 50cm range
-
-    // Phase 1: Move forward until obstacle detected
-    // Ensure servo is centered for straight movement
-    Servo_SetAngle_Safe(0, 1); // gradual return to center
-    HAL_Delay(200);            // Let servo settle
-
-    // Use the new Drive_Forward_Until_Obstacle function
-    Drive_Forward_Until_Obstacle(forward_pwm, obstacle_threshold);
-
-    // Phase 2: Turn right 90 degrees
-    sprintf(buf, "Turning right 90°");
-    OLED_ShowString(0, 30, (uint8_t *)buf);
-    OLED_Refresh_Gram();
-
-    Motor_reverse(2400);
-    HAL_Delay(2700);
-    Motor_stop();
-    HAL_Delay(200);
-    Rotate_Angle(90.0f, turn_pwm, 40); // 90° right turn
-    HAL_Delay(500);
-
-    // Phase 3: Turn left 180 degrees
-    sprintf(buf, "Turning left 180°");
-    OLED_ShowString(0, 30, (uint8_t *)buf);
-    OLED_Refresh_Gram();
-
-    Servo_SetAngle_Safe(0, 1); // gradual return to center
-    HAL_Delay(200);
-
-    Turn_Car(-180.0f, 2500, -5, 0.0f);
-
-    // Sequence complete feedback
-    sprintf(buf, "Sequence complete!");
-    OLED_ShowString(0, 40, (uint8_t *)buf);
-    OLED_Refresh_Gram();
-
-    // Small delay between cycles
-    HAL_Delay(1000);
-  }
-}
 
 void Measure_Motor_Speed_forward(int pwmVal) {
   char buf[64];

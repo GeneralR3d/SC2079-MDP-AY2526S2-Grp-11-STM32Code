@@ -2056,44 +2056,7 @@ int main(void) {
 
    testing();
 
-  //testing_full_obstacle();
-
-//  return 0;
-
-  // typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
-  // SystemState current_state = STATE_RECEIVING;
-
-  // while (1) {
-  //   if (current_state == STATE_RECEIVING) {
-  //     // Below section is for the RPI command unloading
-  //     uint8_t ch;
-  //     if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
-  //       if (ch == '\n' || ch == '\r') {
-  //         if (cmd_index > 0) {
-  //           cmd_buf[cmd_index] = '\0';
-
-  //           // Check if RPI triggered the run
-  //           if (strcmp(cmd_buf, "run") == 0) {
-  //             current_state = STATE_RUNNING;
-  //           } else {
-  //             store_command(cmd_buf);
-  //           }
-  //           cmd_index = 0;
-  //         }
-  //       } else {
-  //         if (cmd_index < CMD_BUF_LEN - 1) {
-  //           cmd_buf[cmd_index++] = ch;
-  //         }
-  //       }
-  //     }
-  //   } else if (current_state == STATE_RUNNING) {
-  //     // Run mode: Execute the array
-  //     process_commands();
-
-  //     // Return to receiving mode once all processing is finished
-  //     current_state = STATE_RECEIVING;
-  //   }
-  // }
+  /****************************START************START*************START********************** */
   // task_two();
   task_two_forward_ir(3000, '>');
   task_two_forward_ir(3000, '<');
@@ -2115,56 +2078,6 @@ int main(void) {
   //     HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
   // }
 
-  // int16_t ax, ay, az, gx, gy, gz;
-  // ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
-
-  // // Scale
-  // ax_g = ax / 16384.0f;
-  // ay_g = ay / 16384.0f;
-  // az_g = az / 16384.0f;
-  // gx_dps = gx / 131.0f;
-  // gy_dps = gy / 131.0f;
-  // gz_dps = gz / 131.0f;
-
-  //    sprintf(buf, "AX:%.2f AY:%.2f", ax_g, ay_g);
-  //    OLED_ShowString(0, 10, (uint8_t *)buf);
-  //
-  //    sprintf(buf, "AZ:%.2f", az_g);
-  //    OLED_ShowString(0, 20, (uint8_t *)buf);
-  //
-  //    sprintf(buf, "GX:%.1f GY:%.1f", gx_dps, gy_dps);
-  //    OLED_ShowString(0, 30, (uint8_t *)buf);
-  //
-  //    sprintf(buf, "GZ:%.1f", gz_dps);
-  //    OLED_ShowString(0, 40, (uint8_t *)buf);
-
-  // OLED_Refresh_Gram();
-
-  // sprintf(buf, "A: %.2fcm D: %.2fcm", distA_cm, distD_cm);
-  // OLED_ShowString(0, 20, (uint8_t*)buf);
-  // OLED_Refresh_Gram();
-
-  // Clear screen at start of loop (optional, prevents overlap)
-  // OLED_Clear();
-
-  // Accelerometer all in one line
-  // sprintf(buf, "AX=%.2f AY=%.2f AZ=%.2f", ax_g, ay_g, az_g);
-  // OLED_ShowString(0, 0, (uint8_t*)buf);
-
-  // // Gyroscope all in one line
-  // sprintf(buf, "GX=%.1f GY=%.1f GZ=%.1f", gx_dps, gy_dps, gz_dps);
-  // OLED_ShowString(0, 10, (uint8_t*)buf);
-
-  //    // Encoder A
-  //    sprintf(buf, "A: %.2f cm", distA_cm);
-  //    OLED_ShowString(0, 20, (uint8_t*)buf);
-
-  // //    // Encoder D
-  //     sprintf(buf, "D: %.2f cm", distD_cm);
-  //     OLED_ShowString(0, 30, (uint8_t*)buf);
-
-  // Refresh OLED
-  // OLED_Refresh_Gram();
 
   /******** IR Sensor Code *******************************************/
   // while (1){

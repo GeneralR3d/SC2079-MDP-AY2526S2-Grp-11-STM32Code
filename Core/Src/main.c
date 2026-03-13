@@ -74,15 +74,6 @@ float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
 char cmd_buf[CMD_BUF_LEN];
 int cmd_index = 0;
 
-// Command queue structures for batching execution
-typedef struct {
-  char type;
-  float value;
-} Command;
-
-#define MAX_COMMANDS 100
-Command cmd_array[MAX_COMMANDS];
-int cmd_count = 0;
 
 // IR global variables
 volatile uint16_t raw6, raw7;
@@ -113,8 +104,6 @@ static void MX_TIM3_Init(void);
 static void MX_TIM11_Init(void);
 static void MX_TIM12_Init(void);
 static void MX_ADC1_Init(void);
-
-#define OBSTACLE_THRESHOLD_CM 3
 
 uint32_t counter = 0; // Timer 2 counter
 int16_t count = 0;    // Convert counter to signed value
@@ -155,6 +144,7 @@ static inline int32_t right_ticks_reverse(void);
 void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
+void Drive_Forward_Until_Obstacle(int speed);
 void cmd_turn_left(float target_cm);
 void cmd_turn_right(float target_cm);
 void cmd_turn_left_reverse(float target_cm);

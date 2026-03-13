@@ -62,8 +62,8 @@ float GYRO_RIGHT_BIAS = 130.959f;
 #define WHEELBASE_CM 14.5f   // distance from front axle to rear axle
 #define TRACK_WIDTH_CM 16.2f // distance between the two rear wheels
 
-// TASK 1
-#define TASK1_PWM 3000
+// TASK 2
+#define TASK2_PWM 3000
 
 float yaw_angle = 0; // global or static variable
 uint32_t last_time = 0;
@@ -1529,14 +1529,13 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 
 void task_two() {
   send_message_over("ACK\n");
-  int speed = 3000;
   float obstacle_clearance_distance = 20; // need to calibrate actual distance
   float obstacle_clearance_actual_distance =
       0; // calculate actual distance between ultrasonic and obstacle
 
   // drive to 1st obstacle
   float first_dist_travelled =
-      task_two_forward_to_obstacle(speed, obstacle_clearance_distance) +
+      task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance) +
       obstacle_clearance_actual_distance;
   float vertical_dist =0;
 
@@ -1545,26 +1544,23 @@ void task_two() {
 
   // turn according to picture (arrow)
   if (direction == '<') {
-    Turn_Car(90, speed, -45,
+    Turn_Car(90, TASK2_PWM, -45,
              0); // values may be wrong calibrate everything below
-    // Drive_Forward_ToCM(5, speed);
-    Turn_Car(180, speed, 45, 0);
-    //Drive_Forward_ToCM(10, speed);
-    Turn_Car(90, speed, -45, 0);
-    // Drive_Forward_ToCM(5, speed);
+    Turn_Car(180, TASK2_PWM, 45, 0);
+    Turn_Car(90, TASK2_PWM, -45, 0);
   } else if (direction == '>') {
-    Turn_Car(90, speed, 45,
+    Turn_Car(90, TASK2_PWM, 45,
              0); // values may be wrong calibrate everything below
-    Drive_Forward_ToCM(5, speed);
-    Turn_Car(90, speed, -45, 0);
-    Drive_Forward_ToCM(10, speed);
-    Turn_Car(90, speed, -45, 0);
-    Drive_Forward_ToCM(5, speed);
-    Turn_Car(90, speed, 45, 0);
+    Drive_Forward_ToCM(5, TASK2_PWM);
+    Turn_Car(90, TASK2_PWM, -45, 0);
+    Drive_Forward_ToCM(10, TASK2_PWM);
+    Turn_Car(90, TASK2_PWM, -45, 0);
+    Drive_Forward_ToCM(5, TASK2_PWM);
+    Turn_Car(90, TASK2_PWM, 45, 0);
   }
 
   float second_dist_travelled =
-      task_two_forward_to_obstacle(speed, obstacle_clearance_distance) +
+      task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance) +
       obstacle_clearance_actual_distance;
 
   // listen to rpi for 2nd obstacle
@@ -1572,40 +1568,40 @@ void task_two() {
 
   // turn according to picture (arrow)
   if (direction == '<') {
-    Turn_Car(90, speed, -45,
+    Turn_Car(90, TASK2_PWM, -45,
              0); // values may be wrong calibrate everything below
-    float half_horizontal_dist = task_two_forward_ir(speed, direction);
-    Turn_Car(180, speed, 45, 0);
+    float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
+    Turn_Car(180, TASK2_PWM, 45, 0);
     Drive_Forward_ToCM(half_horizontal_dist * 2,
-                       speed); // may be completely off
-    Turn_Car(90, speed, 45, 0);
+                       TASK2_PWM); // may be completely off
+    Turn_Car(90, TASK2_PWM, 45, 0);
 
     Drive_Forward_ToCM(
         vertical_dist + second_dist_travelled + first_dist_travelled + 10,
-        speed); // this vertical distance goes back to the starting position in
+        TASK2_PWM); // this vertical distance goes back to the starting position in
                 // the carpark, need to tune so that it stops slightly before
-    Turn_Car(90, speed, 45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist, speed);
-    Turn_Car(90, speed, -45, 0);
+    Turn_Car(90, TASK2_PWM, 45, 0);
+    Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
+    Turn_Car(90, TASK2_PWM, -45, 0);
 
   } else if (direction == '>') {
-    Turn_Car(90, speed, 45,
+    Turn_Car(90, TASK2_PWM, 45,
              0); // values may be wrong calibrate everything below
-    float half_horizontal_dist = task_two_forward_ir(speed, direction);
-    Turn_Car(90, speed, -45, 0);
-    float vertical_dist = task_two_forward_ir(speed, direction);
-    Turn_Car(90, speed, -45, 0);
+    float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
+    Turn_Car(90, TASK2_PWM, -45, 0);
+    float vertical_dist = task_two_forward_ir(TASK2_PWM, direction);
+    Turn_Car(90, TASK2_PWM, -45, 0);
     Drive_Forward_ToCM(half_horizontal_dist * 2,
-                       speed); // may be completely off
-    Turn_Car(90, speed, -45, 0);
+                       TASK2_PWM); // may be completely off
+    Turn_Car(90, TASK2_PWM, -45, 0);
 
     Drive_Forward_ToCM(
         vertical_dist + second_dist_travelled + first_dist_travelled + 10,
-        speed); // this vertical distance goes back to the starting position in
+        TASK2_PWM); // this vertical distance goes back to the starting position in
                 // the carpark, need to tune so that it stops slightly before
-    Turn_Car(90, speed, -45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist, speed);
-    Turn_Car(90, speed, 45, 0);
+    Turn_Car(90, TASK2_PWM, -45, 0);
+    Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
+    Turn_Car(90, TASK2_PWM, 45, 0);
   }
 
   // Inform RPI end of task 2
@@ -1832,9 +1828,6 @@ void testing() {
   // Turn_Car_Reverse(90,3000,45,0);
   // HAL_Delay(10000);
   // Turn_Car_Reverse(90,3000,-45,0);
-	//Drive_Reverse_ToCM(100, TASK1_PWM);
-//	Drive_Forward_ToCM(50, TASK1_PWM);
-//	Drive_Forward_ToCM(25, TASK1_PWM);
   //front_back_test();
   //turning_test();
 }

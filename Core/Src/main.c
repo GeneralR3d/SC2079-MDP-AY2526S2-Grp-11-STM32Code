@@ -20,10 +20,6 @@ UART_HandleTypeDef huart3;
 //------------------------------------------
 // Global variables
 //------------------------------------------
-static int PWM_TRIM_FORWARD =
-    -450; // negative slows the left side to fix veer-right
-static int PWM_TRIM_REVERSE =
-    -450; // positive slows the right side to fix veer-left
 
 // average distance using the calibrated scales
 // if actual > measured, then COUNTS_PER_CM_L and COUNTS_PER_CM_R should be
@@ -276,69 +272,6 @@ void Motor_forward_simple(int pwmValL, int pwmValR) {
   OLED_ShowString(0, 10, buf);
 }
 
-void Motor_forward_advanced(int pwmVal) {
-  // Gain
-  const float Kp_balance = 50.0f;
-
-  // --- encoder balancing (dir-safe) ---
-  int32_t dL = left_ticks_forward();
-  int32_t dR = right_ticks_forward();
-  float normL = (float)dL / COUNTS_PER_CM_L;
-  float normR = (float)dR / COUNTS_PER_CM_R;
-
-  float e = normL - normR;
-  int corr = (int)(Kp_balance * e);
-  if (corr > 1200)
-    corr = 1200;
-  if (corr < -1200)
-    corr = -1200;
-
-  int left_cmd = pwmVal + PWM_TRIM_FORWARD - corr;
-  int right_cmd = pwmVal - PWM_TRIM_FORWARD + corr;
-
-  // Motor A: PWM on CH3, CH4 = 0
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, left_cmd);
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
-
-  // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, right_cmd);
-
-  sprintf(buf, "PWM= %4d/%4d ", left_cmd, right_cmd);
-  OLED_ShowString(0, 10, buf);
-}
-
-void Motor_reverse_advanced(int pwmVal) {
-  // Gain
-  const float Kp_balance = 50.0f;
-
-  // --- encoder balancing (dir-safe) ---
-  int32_t dL = left_ticks_reverse();
-  int32_t dR = right_ticks_reverse();
-  float normL = (float)dL / COUNTS_PER_CM_L;
-  float normR = (float)dR / COUNTS_PER_CM_R;
-
-  float e = normL - normR;
-  int corr = (int)(Kp_balance * e);
-  if (corr > 1200)
-    corr = 1200;
-  if (corr < -1200)
-    corr = -1200;
-
-  int left_cmd = pwmVal + PWM_TRIM_REVERSE - corr;
-  int right_cmd = pwmVal - PWM_TRIM_REVERSE + corr;
-
-  // Motor A: PWM on CH3, CH4 = 0
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, left_cmd);
-
-  // Motor D: PWM on CH4, CH3 = 0 (inverted because wired opposite)
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, right_cmd);
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
-
-  sprintf(buf, "PWM= %4d/%4d ", left_cmd, right_cmd);
-  OLED_ShowString(0, 10, buf);
-}
 
 void Motor_reverse_simple(int pwmValL, int pwmValR) {
   // Motor A: PWM on CH3, CH4 = 0

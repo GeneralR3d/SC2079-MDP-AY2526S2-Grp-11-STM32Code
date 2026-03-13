@@ -41,10 +41,7 @@ const float COUNTS_PER_CM_R_REVERSE = 74.89f;
 volatile int32_t SERVO_CENTER_US = 1477;
 // 1475 is left
 // 1480 is right
-float TURN_RADIUS_LEFT = 24.75f;  // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_RIGHT = 24.75f; // min turning radius (cm) when steering is 45°
-float TURN_RADIUS_LEFT_REVERSE = 23.87f;
-float TURN_RADIUS_RIGHT_REVERSE = 23.87f;
+
 
 // HPL
 // float GYRO_LEFT_BIAS = 131.33f;
@@ -1692,70 +1689,6 @@ void front_back_test() {
 
 
 
-void turning_test() {
-
-
-
-
-  // Test Case
-  // Left
-  int angle_dir = -1;
-
-  float quarter_turn_left = 0.25f * TURN_RADIUS_LEFT * 2.0 * PI;
-  float semi_turn_left = 0.50f * TURN_RADIUS_LEFT * 2.0 * PI;
-  float full_turn_left = TURN_RADIUS_LEFT * 2.0 * PI;
-
-  float quarter_turn_right = 0.25 * TURN_RADIUS_RIGHT * 2.0 * PI;
-  float semi_turn_right = 0.50 * TURN_RADIUS_RIGHT * 2.0 * PI;
-  float full_turn_right = TURN_RADIUS_RIGHT * 2.0 * PI;
-
-  int delay_btw_cmds = 2000;
-  int delay_after_cmds = 5000;
-
-  // Left
-  for (int i = 0; i < 4; ++i) {
-    cmd_turn_left(quarter_turn_left);
-    HAL_Delay(delay_btw_cmds);
-  }
-
-  HAL_Delay(delay_after_cmds);
-
-  for (int i = 0; i < 2; ++i) {
-    cmd_turn_left(semi_turn_left);
-    HAL_Delay(delay_btw_cmds);
-  }
-
-  HAL_Delay(delay_after_cmds);
-
-  for (int i = 0; i < 1; ++i) {
-    cmd_turn_left(full_turn_left);
-    HAL_Delay(delay_btw_cmds);
-  }
-
-  HAL_Delay(delay_after_cmds);
-
-  // Right
-  // angle_dir = 1;
-
-  // for(int i = 0; i < 4; ++i) {
-  //   cmd_turn_right(quarter_turn_right);
-  //   HAL_Delay(delay_btw_cmds);
-  // }
-
-  // HAL_Delay(delay_after_cmds);
-
-  // for(int i = 0; i < 2; ++i) {
-  //   cmd_turn_right(semi_turn_right);
-  //   HAL_Delay(delay_btw_cmds);
-  // }
-
-  // HAL_Delay(delay_after_cmds);
-
-  // for(int i = 0; i < 1; ++i) {
-  //   cmd_turn_right(full_turn_right);
-  //   HAL_Delay(3000);
-  // }
-}
 
 void testing() {
   // Turn_Car_Reverse(90,3000,45,0);

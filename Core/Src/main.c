@@ -1849,7 +1849,7 @@ void Measure_Motor_Speed_forward(int pwmVal) {
 void task_two() {
   send_message_over("ACK\n");
   int speed = 3000;
-  float obstacle_clearance_distance = 52; // need to calibrate actual distance
+  float obstacle_clearance_distance = 20; // need to calibrate actual distance
   float obstacle_clearance_actual_distance =
       0; // calculate actual distance between ultrasonic and obstacle
 
@@ -1857,20 +1857,20 @@ void task_two() {
   float first_dist_travelled =
       task_two_forward_to_obstacle(speed, obstacle_clearance_distance) +
       obstacle_clearance_actual_distance;
+  float vertical_dist =0;
 
   // listen to rpi for 1st obstacle
-  char direction = task_two_uart();
+  char direction = '<';
 
   // turn according to picture (arrow)
   if (direction == '<') {
     Turn_Car(90, speed, -45,
              0); // values may be wrong calibrate everything below
-    Drive_Forward_ToCM(5, speed);
-    Turn_Car(90, speed, 45, 0);
-    Drive_Forward_ToCM(10, speed);
-    Turn_Car(90, speed, 45, 0);
-    Drive_Forward_ToCM(5, speed);
+    // Drive_Forward_ToCM(5, speed);
+    Turn_Car(180, speed, 45, 0);
+    //Drive_Forward_ToCM(10, speed);
     Turn_Car(90, speed, -45, 0);
+    // Drive_Forward_ToCM(5, speed);
   } else if (direction == '>') {
     Turn_Car(90, speed, 45,
              0); // values may be wrong calibrate everything below
@@ -1887,16 +1887,14 @@ void task_two() {
       obstacle_clearance_actual_distance;
 
   // listen to rpi for 2nd obstacle
-  direction = task_two_uart();
+  direction = '<';
 
   // turn according to picture (arrow)
   if (direction == '<') {
     Turn_Car(90, speed, -45,
              0); // values may be wrong calibrate everything below
     float half_horizontal_dist = task_two_forward_ir(speed, direction);
-    Turn_Car(90, speed, 45, 0);
-    float vertical_dist = task_two_forward_ir(speed, direction);
-    Turn_Car(90, speed, 45, 0);
+    Turn_Car(180, speed, 45, 0);
     Drive_Forward_ToCM(half_horizontal_dist * 2,
                        speed); // may be completely off
     Turn_Car(90, speed, 45, 0);
@@ -2045,6 +2043,7 @@ float task_two_forward_ir(int speed, char direction) {
       mv6 = (uint32_t)raw6 * 3300u / 4095u;
       dist6 = dist_cm_from_mv_6(mv6);
 
+
       if (dist6 >= 50) {
         Motor_reverse_simple(1000, 1000);
         HAL_Delay(50);
@@ -2052,7 +2051,6 @@ float task_two_forward_ir(int speed, char direction) {
         return cm_travelled_forward(); // may need to change if reset encoders
                                        // does not reset ticks
       }
-
       sprintf(buf, "%.2f", dist6);
 
     } else if (direction == '>') {
@@ -2071,13 +2069,13 @@ float task_two_forward_ir(int speed, char direction) {
 
       sprintf(buf, "%.2f", dist7);
     }
-  }
+  
 
   OLED_ShowString(0, 20, (uint8_t *)buf);
   OLED_Refresh_Gram();
   HAL_Delay(100);
-
-  Motor_forward_advanced(speed);
+  Motor_forward(speed);
+  }
 }
 
 void front_back_test() {
@@ -2441,40 +2439,43 @@ int main(void) {
 
 //  return 0;
 
-  typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
-  SystemState current_state = STATE_RECEIVING;
+  // typedef enum { STATE_RECEIVING, STATE_RUNNING } SystemState;
+  // SystemState current_state = STATE_RECEIVING;
 
-  while (1) {
-    if (current_state == STATE_RECEIVING) {
-      // Below section is for the RPI command unloading
-      uint8_t ch;
-      if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
-        if (ch == '\n' || ch == '\r') {
-          if (cmd_index > 0) {
-            cmd_buf[cmd_index] = '\0';
+  // while (1) {
+  //   if (current_state == STATE_RECEIVING) {
+  //     // Below section is for the RPI command unloading
+  //     uint8_t ch;
+  //     if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+  //       if (ch == '\n' || ch == '\r') {
+  //         if (cmd_index > 0) {
+  //           cmd_buf[cmd_index] = '\0';
 
-            // Check if RPI triggered the run
-            if (strcmp(cmd_buf, "run") == 0) {
-              current_state = STATE_RUNNING;
-            } else {
-              store_command(cmd_buf);
-            }
-            cmd_index = 0;
-          }
-        } else {
-          if (cmd_index < CMD_BUF_LEN - 1) {
-            cmd_buf[cmd_index++] = ch;
-          }
-        }
-      }
-    } else if (current_state == STATE_RUNNING) {
-      // Run mode: Execute the array
-      process_commands();
+  //           // Check if RPI triggered the run
+  //           if (strcmp(cmd_buf, "run") == 0) {
+  //             current_state = STATE_RUNNING;
+  //           } else {
+  //             store_command(cmd_buf);
+  //           }
+  //           cmd_index = 0;
+  //         }
+  //       } else {
+  //         if (cmd_index < CMD_BUF_LEN - 1) {
+  //           cmd_buf[cmd_index++] = ch;
+  //         }
+  //       }
+  //     }
+  //   } else if (current_state == STATE_RUNNING) {
+  //     // Run mode: Execute the array
+  //     process_commands();
 
-      // Return to receiving mode once all processing is finished
-      current_state = STATE_RECEIVING;
-    }
-  }
+  //     // Return to receiving mode once all processing is finished
+  //     current_state = STATE_RECEIVING;
+  //   }
+  // }
+  // task_two();
+  task_two_forward_ir(3000, '>');
+  task_two_forward_ir(3000, '<');
 
   // uint32_t distance = HCSR04_Read();
 

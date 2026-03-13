@@ -1537,53 +1537,6 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 
 
 
-void Measure_Motor_Speed_forward(int pwmVal) {
-  char buf[64];
-  reset_encoders();
-
-  uint32_t last_tick = HAL_GetTick();
-  int32_t last_left = left_ticks_forward();
-  int32_t last_right = right_ticks_forward();
-
-  // Display initial message
-  OLED_Clear();
-  sprintf(buf, "RPM Test PWM=%d", pwmVal);
-  OLED_ShowString(0, 0, (uint8_t *)buf);
-  OLED_Refresh_Gram();
-
-  // Start motors
-  Motor_forward_advanced(pwmVal);
-
-  while (1) {
-    if (HAL_GetTick() - last_tick >= 100) {
-      int32_t current_left = left_ticks_forward();
-      int32_t current_right = right_ticks_forward();
-
-      int32_t delta_left = current_left - last_left;
-      int32_t delta_right = current_right - last_right;
-
-      // Update last values
-      last_tick = HAL_GetTick();
-      last_left = current_left;
-      last_right = current_right;
-
-      float cm_curr_left = (float)delta_left / COUNTS_PER_CM_L;
-      float cm_curr_right = (float)delta_right / COUNTS_PER_CM_R;
-
-      // Print to UART (Serial Monitor)
-      // Format: "PWM: <pwm> | L: <cm> | R: <cm>\r\n"
-      sprintf(buf, "PWM:%d L:%.2f R:%.2f\r\n", pwmVal, cm_curr_left,
-              cm_curr_right);
-      HAL_UART_Transmit(&huart3, (uint8_t *)buf, strlen(buf), HAL_MAX_DELAY);
-
-      // Optional: Print to OLED for convenience
-      sprintf(buf, "L:%.1f R:%.1f   ", cm_curr_left, cm_curr_right);
-      OLED_ShowString(0, 20, (uint8_t *)buf);
-      OLED_Refresh_Gram();
-    }
-  }
-}
-
 void task_two() {
   send_message_over("ACK\n");
   int speed = 3000;
@@ -1721,35 +1674,6 @@ char task_two_uart() {
 }
 
 
-  // while (1) {
-  //   send_message_over("snap\n"); // tell rpi to handle this
-  //   uint8_t ch;
-
-  //   if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
-
-  //     if (ch == '\n' || ch == '\r') {
-  //       if (cmd_i > 0) {
-  //         cmd[cmd_i] = '\0';
-
-  //         char type;
-  //         sscanf(cmd, "%c", &type);
-  //         send_message_over(cmd);
-  //         if (type == '>' || type == '<') {
-  //           send_message_over("ACK\n");
-  //           return type;
-  //         } else {
-  //           send_message_over("error\n");
-  //           send_message_over("ACK\n");
-  //           cmd_i = 0;
-  //         }
-  //       }
-  //     } else {
-  //       if (cmd_i < CMD_BUF_LEN - 1) {
-  //         cmd[cmd_i++] = ch;
-  //       }
-  //     }
-  //   }
-  // }
 
 float task_two_forward_to_obstacle(int speed,
                                    float obstacle_clearance_distance) {

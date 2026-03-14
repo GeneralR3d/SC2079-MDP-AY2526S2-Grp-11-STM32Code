@@ -137,8 +137,7 @@ void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
 float task_two_clear_first_obs(int pwm, float first_obs_dist, char direction);
-void Drive_Forward_Until_Obstacle(int base_pwm,
-                                  uint32_t obstacle_threshold_cm);
+void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
@@ -279,9 +278,7 @@ void Motor_reverse_simple(int pwmValL, int pwmValR) {
 // THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
 static uint8_t motor_forward_needs_reset = 0;
 
-void Motor_forward_reset_heading(void) {
-  motor_forward_needs_reset = 1;
-}
+void Motor_forward_reset_heading(void) { motor_forward_needs_reset = 1; }
 
 void Motor_forward(int pwmVal) {
   // --- Static variables persist across calls ---
@@ -1477,42 +1474,25 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 
 void task_two() {
   send_message_over("ACK\n");
-  float obstacle_clearance_distance = 20; // need to calibrate actual distance
-  float obstacle_clearance_actual_distance =
-      0; // calculate actual distance between ultrasonic and obstacle
-
-  // drive to 1st obstacle
-  float first_dist_travelled =
-      task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance) +
-      obstacle_clearance_actual_distance;
-  float vertical_dist = 0;
+  // define vars
+  float obstacle_clearance_distance =
+      30.0f; // need to calibrate actual distance
 
   // listen to rpi for 1st obstacle
-  char direction = '<';
+  char direction = '<'; // task_two_uart()
 
-  // turn according to picture (arrow)
-  if (direction == '<') {
-    Turn_Car(90, TASK2_PWM, -45,
-             0); // values may be wrong calibrate everything below
-    Turn_Car(180, TASK2_PWM, 45, 0);
-    Turn_Car(90, TASK2_PWM, -45, 0);
-  } else if (direction == '>') {
-    Turn_Car(90, TASK2_PWM, 45,
-             0); // values may be wrong calibrate everything below
-    Drive_Forward_ToCM(5, TASK2_PWM);
-    Turn_Car(90, TASK2_PWM, -45, 0);
-    Drive_Forward_ToCM(10, TASK2_PWM);
-    Turn_Car(90, TASK2_PWM, -45, 0);
-    Drive_Forward_ToCM(5, TASK2_PWM);
-    Turn_Car(90, TASK2_PWM, 45, 0);
-  }
+  // drive around 1st obstacle
+  float first_dist_travelled = task_two_clear_first_obs(
+      TASK2_PWM, obstacle_clearance_distance, direction);
+
+  TASK2_vertical_dist_now = cm_travelled_forward();
 
   float second_dist_travelled =
       task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance) +
       obstacle_clearance_actual_distance;
 
   // listen to rpi for 2nd obstacle
-  direction = '<';
+  direction = '<'; // task_two_uart()
 
   // turn according to picture (arrow)
   if (direction == '<') {
@@ -1607,63 +1587,58 @@ char task_two_uart() {
   return 0;
 }
 
-float task_two_clear_first_obs(int pwm, float first_obs_dist, char direction) {
-  
+float task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
+                               char direction) {
+
   reset_encoders();
   Motor_forward_reset_heading();
-  uint32_t movement_start_time;
 
   float current_pwm = pwm;
-  float target_dist = first_obs_dist - 30.0f;
 
   // forward for some distance
-  while(1){
+  while (1) {
 
-  float cm_now = cm_travelled_forward();
-  float progress = cm_now/target_dist;
-  if (progress >= 1)
-    break;
+    float cm_left = HCSR04_Read() - obstacle_clearance_distance;
 
-  // Speed ramping (from your friend's code)
-  if (progress > 0.95f) {
-    current_pwm = pwmMin; // Final crawl
-  } else if (progress > 0.85f) {
-    current_pwm = (int)(pwm * 0.3f);
-  } else if (progress > 0.7f) {
-    current_pwm = (int)(pwm * 0.6f);
-  }
+    if (cm_left <= 0)
+      break;
 
-  if (current_pwm < pwmMin) current_pwm = pwmMin;
+    // Speed ramping
+    if (cm_left < 5) {
+      current_pwm = pwmMin; // Final crawl
+    } else if (cm_left < 10) {
+      current_pwm = (int)(pwm * 0.3f);
+    } else if (cm_left < 15) {
+      current_pwm = (int)(pwm * 0.6f);
+    }
 
-  Motor_forward(current_pwm);
+    if (current_pwm < pwmMin)
+      current_pwm = pwmMin;
+
+    Motor_forward(current_pwm);
   }
 
   Motor_stop();
 
   // no stop, turn and continue, HARDCODED
   if (direction == '<') {
-    Servo_SetAngle_Safe(-30,0);
-    Motor_forward_simple(pwm,pwm);
+    Servo_SetAngle_Safe(-40, 0);
+    Motor_forward_simple(pwm, pwm);
     HAL_Delay(600);
-    Servo_SetAngle_Safe(30,0);
-    Motor_forward_simple(pwm* 0.7,pwm* 0.7);
+    Servo_SetAngle_Safe(40, 0);
+    Motor_forward_simple(pwm * 0.7, pwm * 0.7);
     HAL_Delay(800);
-    Servo_SetAngle_Safe(0,0);
-  }
-  else if (direction == '>') {
-    Servo_SetAngle_Safe(30,0);
-    Motor_forward_simple(pwm,pwm);
+    Servo_SetAngle_Safe(0, 0);
+  } else if (direction == '>') {
+    Servo_SetAngle_Safe(30, 0);
+    Motor_forward_simple(pwm, pwm);
     HAL_Delay(600);
-    Servo_SetAngle_Safe(-30,0);
-    Motor_forward_simple(pwm,pwm);
+    Servo_SetAngle_Safe(-30, 0);
+    Motor_forward_simple(pwm, pwm);
     HAL_Delay(600);
-    Servo_SetAngle_Safe(0,0);
+    Servo_SetAngle_Safe(0, 0);
   }
   Motor_stop();
-
-
-   
-
 }
 
 float task_two_forward_ir(int speed, char direction) {
@@ -1744,13 +1719,7 @@ void testing() {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
-  //task_two_clear_first_obs(TASK2_PWM, 50, '<');
-  while(1){
-  float dist = HCSR04_Read();
-  sprintf(buf, "%.2f", dist);
-  OLED_ShowString(0, 10, (uint8_t *)buf);
-  OLED_Refresh_Gram();
-  }
+  task_two_clear_first_obs(TASK2_PWM, 50, '<');
 }
 
 /* USER CODE END 0 */

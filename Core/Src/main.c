@@ -136,15 +136,15 @@ static inline int32_t right_ticks_reverse(void);
 void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
-void Drive_Forward_Until_Obstacle(int speed);
+float task_two_clear_first_obs(int pwm, float first_obs_dist, char direction);
+void Drive_Forward_Until_Obstacle(int base_pwm,
+                                  uint32_t obstacle_threshold_cm);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two();
 char task_two_uart();
-float task_two_forward_to_obstacle(int speed,
-                                   float obstacle_clearance_distance);
 float task_two_forward_ir(int speed, char direction);
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
@@ -884,7 +884,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
   while (1) {
     //     Emergency stop for obstacles
-    if (HCSR04_Read() <= OBSTACLE_THRESHOLD_CM) {
+    if (HCSR04_Read() <= 15) {
       // Motor_stop();
       OLED_ShowString(0, 30, "Obstacle detected!");
       HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
@@ -913,8 +913,6 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
       pwm = pwmMin;
 
     Motor_forward(pwm); // feb 23
-    // Motor_forward_simple(pwm);
-    //     Motor_forward_advanced(pwm); // feb 23
 
     // Display progress
     snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1609,24 +1607,63 @@ char task_two_uart() {
   return 0;
 }
 
-float task_two_clear_first_obs(int speed, float obstacle_clearance_distance,
-                               char direction) {
+float task_two_clear_first_obs(int pwm, float first_obs_dist, char direction) {
+  
   reset_encoders();
+  Motor_forward_reset_heading();
+  uint32_t movement_start_time;
 
-  while (1) {
-    if (HCSR04_Read() <= obstacle_clearance_distance) {
-      Motor_reverse_simple(1000, 1000);
-      HAL_Delay(50);
-      Motor_stop();
-      float dist_now = cm_travelled_forward();
-      OLED_ShowString(0, 30, "Obstacle detected!");
-      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-      HAL_Delay(1000);
-      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-      return dist_now;
-    }
-    Motor_forward_advanced(speed);
+  float current_pwm = pwm;
+  float target_dist = first_obs_dist - 30.0f;
+
+  // forward for some distance
+  while(1){
+
+  float cm_now = cm_travelled_forward();
+  float progress = cm_now/target_dist;
+  if (progress >= 1)
+    break;
+
+  // Speed ramping (from your friend's code)
+  if (progress > 0.95f) {
+    current_pwm = pwmMin; // Final crawl
+  } else if (progress > 0.85f) {
+    current_pwm = (int)(pwm * 0.3f);
+  } else if (progress > 0.7f) {
+    current_pwm = (int)(pwm * 0.6f);
   }
+
+  if (current_pwm < pwmMin) current_pwm = pwmMin;
+
+  Motor_forward(current_pwm);
+  }
+
+  Motor_stop();
+
+  // no stop, turn and continue, HARDCODED
+  if (direction == '<') {
+    Servo_SetAngle_Safe(-30,0);
+    Motor_forward_simple(pwm,pwm);
+    HAL_Delay(600);
+    Servo_SetAngle_Safe(30,0);
+    Motor_forward_simple(pwm* 0.7,pwm* 0.7);
+    HAL_Delay(800);
+    Servo_SetAngle_Safe(0,0);
+  }
+  else if (direction == '>') {
+    Servo_SetAngle_Safe(30,0);
+    Motor_forward_simple(pwm,pwm);
+    HAL_Delay(600);
+    Servo_SetAngle_Safe(-30,0);
+    Motor_forward_simple(pwm,pwm);
+    HAL_Delay(600);
+    Servo_SetAngle_Safe(0,0);
+  }
+  Motor_stop();
+
+
+   
+
 }
 
 float task_two_forward_ir(int speed, char direction) {
@@ -1707,6 +1744,13 @@ void testing() {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
+  //task_two_clear_first_obs(TASK2_PWM, 50, '<');
+  while(1){
+  float dist = HCSR04_Read();
+  sprintf(buf, "%.2f", dist);
+  OLED_ShowString(0, 10, (uint8_t *)buf);
+  OLED_Refresh_Gram();
+  }
 }
 
 /* USER CODE END 0 */
@@ -1842,8 +1886,6 @@ int main(void) {
   /****************************START************START*************START**********************
    */
   // task_two();
-  task_two_forward_ir(3000, '>');
-  task_two_forward_ir(3000, '<');
 
   // uint32_t distance = HCSR04_Read();
 

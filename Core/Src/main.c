@@ -136,7 +136,7 @@ static inline int32_t right_ticks_reverse(void);
 void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
-float task_two_clear_first_obs(int pwm, float first_obs_dist, char direction);
+void task_two_clear_first_obs(int pwm, float first_obs_dist, char direction);
 void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
@@ -1482,60 +1482,59 @@ void task_two() {
   char direction = '<'; // task_two_uart()
 
   // drive around 1st obstacle
-  float first_dist_travelled = task_two_clear_first_obs(
-      TASK2_PWM, obstacle_clearance_distance, direction);
+    // task_two_clear_first_obs(
+    //   TASK2_PWM, obstacle_clearance_distance, direction);
 
   TASK2_vertical_dist_now = cm_travelled_forward();
 
   float second_dist_travelled =
-      task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance) +
-      obstacle_clearance_actual_distance;
+      task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance);
 
   // listen to rpi for 2nd obstacle
   direction = '<'; // task_two_uart()
 
   // turn according to picture (arrow)
-  if (direction == '<') {
-    Turn_Car(90, TASK2_PWM, -45,
-             0); // values may be wrong calibrate everything below
-    float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
-    Turn_Car(180, TASK2_PWM, 45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist * 2,
-                       TASK2_PWM); // may be completely off
-    Turn_Car(90, TASK2_PWM, 45, 0);
+  // if (direction == '<') {
+  //   Turn_Car(90, TASK2_PWM, -45,
+  //            0); // values may be wrong calibrate everything below
+  //   float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
+  //   Turn_Car(180, TASK2_PWM, 45, 0);
+  //   Drive_Forward_ToCM(half_horizontal_dist * 2,
+  //                      TASK2_PWM); // may be completely off
+  //   Turn_Car(90, TASK2_PWM, 45, 0);
 
-    Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
-                           first_dist_travelled + 10,
-                       TASK2_PWM); // this vertical distance goes back to the
-                                   // starting position in the carpark, need to
-                                   // tune so that it stops slightly before
-    Turn_Car(90, TASK2_PWM, 45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
-    Turn_Car(90, TASK2_PWM, -45, 0);
+  //   Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
+  //                          first_dist_travelled + 10,
+  //                      TASK2_PWM); // this vertical distance goes back to the
+  //                                  // starting position in the carpark, need to
+  //                                  // tune so that it stops slightly before
+  //   Turn_Car(90, TASK2_PWM, 45, 0);
+  //   Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
+  //   Turn_Car(90, TASK2_PWM, -45, 0);
 
-  } else if (direction == '>') {
-    Turn_Car(90, TASK2_PWM, 45,
-             0); // values may be wrong calibrate everything below
-    float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
-    Turn_Car(90, TASK2_PWM, -45, 0);
-    float vertical_dist = task_two_forward_ir(TASK2_PWM, direction);
-    Turn_Car(90, TASK2_PWM, -45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist * 2,
-                       TASK2_PWM); // may be completely off
-    Turn_Car(90, TASK2_PWM, -45, 0);
+  // } else if (direction == '>') {
+  //   Turn_Car(90, TASK2_PWM, 45,
+  //            0); // values may be wrong calibrate everything below
+  //   float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
+  //   Turn_Car(90, TASK2_PWM, -45, 0);
+  //   float vertical_dist = task_two_forward_ir(TASK2_PWM, direction);
+  //   Turn_Car(90, TASK2_PWM, -45, 0);
+  //   Drive_Forward_ToCM(half_horizontal_dist * 2,
+  //                      TASK2_PWM); // may be completely off
+  //   Turn_Car(90, TASK2_PWM, -45, 0);
 
-    Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
-                           first_dist_travelled + 10,
-                       TASK2_PWM); // this vertical distance goes back to the
-                                   // starting position in the carpark, need to
-                                   // tune so that it stops slightly before
-    Turn_Car(90, TASK2_PWM, -45, 0);
-    Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
-    Turn_Car(90, TASK2_PWM, 45, 0);
-  }
+  //   Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
+  //                          first_dist_travelled + 10,
+  //                      TASK2_PWM); // this vertical distance goes back to the
+  //                                  // starting position in the carpark, need to
+  //                                  // tune so that it stops slightly before
+  //   Turn_Car(90, TASK2_PWM, -45, 0);
+  //   Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
+  //   Turn_Car(90, TASK2_PWM, 45, 0);
+  // }
 
-  // Inform RPI end of task 2
-  send_message_over("END\n");
+  // // Inform RPI end of task 2
+  // send_message_over("END\n");
 }
 
 #define SNAP_WAIT_MS 8000 // 8 seconds to retry once
@@ -1586,14 +1585,32 @@ char task_two_uart() {
   send_message_over("timeout\n");
   return 0;
 }
+/**
+Updates: TASK2_vertical_dist_now SIDE AFFECT
+ */
 
-float task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
+void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
                                char direction) {
 
   reset_encoders();
   Motor_forward_reset_heading();
 
+  float first, second, third;
   float current_pwm = pwm;
+  // CALIBRATE THIS
+  const float distance_from_back_of_obs = 30;
+
+  if (direction == '<') {
+    /****left */
+    first = 600;
+    second = 1150;
+    third = 950;
+  } else if (direction == '>') {
+    /****right */
+    first = 500;
+    second = 1350;
+    third = 750;
+  }
 
   // forward for some distance
   while (1) {
@@ -1605,7 +1622,7 @@ float task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
 
     // Speed ramping
     if (cm_left < 5) {
-      current_pwm = pwmMin; // Final crawl
+      current_pwm = (int)(pwm * 0.2f); // Final crawl
     } else if (cm_left < 10) {
       current_pwm = (int)(pwm * 0.3f);
     } else if (cm_left < 15) {
@@ -1622,23 +1639,32 @@ float task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
 
   // no stop, turn and continue, HARDCODED
   if (direction == '<') {
-    Servo_SetAngle_Safe(-40, 0);
+    Servo_SetAngle_Safe(-45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(600);
-    Servo_SetAngle_Safe(40, 0);
-    Motor_forward_simple(pwm * 0.7, pwm * 0.7);
-    HAL_Delay(800);
+    HAL_Delay(first);
+    Servo_SetAngle_Safe(45, 0);
+    Motor_forward_simple(pwm, pwm);
+    HAL_Delay(second);
+    Servo_SetAngle_Safe(-45, 0);
+    Motor_forward_simple(pwm, pwm);
+    HAL_Delay(third);
     Servo_SetAngle_Safe(0, 0);
   } else if (direction == '>') {
-    Servo_SetAngle_Safe(30, 0);
+    Servo_SetAngle_Safe(45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(600);
-    Servo_SetAngle_Safe(-30, 0);
+    HAL_Delay(first);
+    Servo_SetAngle_Safe(-45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(600);
+    HAL_Delay(second);
+    Servo_SetAngle_Safe(45, 0);
+    Motor_forward_simple(pwm, pwm);
+    HAL_Delay(third);
     Servo_SetAngle_Safe(0, 0);
+
   }
   Motor_stop();
+  TASK2_vertical_dist_now += cm_travelled_forward() + obstacle_clearance_distance + 10+ distance_from_back_of_obs;
+  return;
 }
 
 float task_two_forward_ir(int speed, char direction) {
@@ -1719,7 +1745,11 @@ void testing() {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
-  task_two_clear_first_obs(TASK2_PWM, 50, '<');
+
+    task_two_clear_first_obs(3000, 40, '>');
+  
+    HAL_Delay(7000);
+    task_two_clear_first_obs(3000, 40, '<');
 }
 
 /* USER CODE END 0 */

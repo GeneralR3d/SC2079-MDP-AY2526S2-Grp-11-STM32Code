@@ -144,7 +144,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two();
 char task_two_uart();
-float task_two_forward_ir(int speed, char direction);
+
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
@@ -535,37 +535,33 @@ static inline uint32_t tim_arr(TIM_TypeDef *t) {
 static inline int32_t left_ticks_forward(void) {
   uint32_t arrp1 = tim_arr(TIM2) + 1u;
   int32_t d = (int32_t)((uint32_t)TIM2->CNT - (uint32_t)L0);
-  if (d < 0)
+  if (d < -(int32_t)(arrp1 / 2))
     d += (int32_t)arrp1;
+  else if (d > (int32_t)(arrp1 / 2))
+    d -= (int32_t)arrp1;
   return d;
 }
 
 // Forward ticks on RIGHT wheel since reset (>=0); flip sense (R reversed)
 static inline int32_t right_ticks_forward(void) {
   uint32_t arrp1 = tim_arr(TIM5) + 1u;
-  int32_t d = (int32_t)((int32_t)R0 - (int32_t)TIM5->CNT);
-  if (d < 0)
+  int32_t d = (int32_t)((uint32_t)R0 - (uint32_t)TIM5->CNT);
+  if (d < -(int32_t)(arrp1 / 2))
     d += (int32_t)arrp1;
+  else if (d > (int32_t)(arrp1 / 2))
+    d -= (int32_t)arrp1;
   return d;
 }
 
 // Reverse ticks on LEFT wheel since reset (>=0); counts when wheel turns
 // backward
 static inline int32_t left_ticks_reverse(void) {
-  uint32_t arrp1 = tim_arr(TIM2) + 1u;
-  int32_t d = (int32_t)((uint32_t)L0 - (uint32_t)TIM2->CNT);
-  if (d < 0)
-    d += (int32_t)arrp1;
-  return d;
+  return -left_ticks_forward();
 }
 
 // Reverse ticks on RIGHT wheel since reset (>=0); flip sense (R reversed)
 static inline int32_t right_ticks_reverse(void) {
-  uint32_t arrp1 = tim_arr(TIM5) + 1u;
-  int32_t d = (int32_t)((uint32_t)TIM5->CNT - (uint32_t)R0);
-  if (d < 0)
-    d += (int32_t)arrp1;
-  return d;
+  return -right_ticks_forward();
 }
 
 static inline void reset_encoders(void) {
@@ -836,6 +832,7 @@ float gyro_z_bias = 0.0f;
 // HCSR04 (Ultrasonic Sensor) Reading Function
 uint32_t HCSR04_Read(void) {
   uint32_t start_tick, stop_tick, pulse_length;
+  uint32_t timeout;
 
   // --- 1. Send 10 µs pulse on TRIG ---
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_SET);
@@ -844,14 +841,18 @@ uint32_t HCSR04_Read(void) {
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_14, GPIO_PIN_RESET);
 
   // --- 2. Wait for ECHO rising edge ---
-  while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_RESET)
-    ;
+  timeout = 1000000;
+  while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_RESET) {
+    if (--timeout == 0) return 999; // Error safety timeout, pretend obstacle is far away
+  }
 
   start_tick = DWT->CYCCNT;
 
   // --- 3. Wait for ECHO falling edge ---
-  while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_SET)
-    ;
+  timeout = 1000000;
+  while (HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_9) == GPIO_PIN_SET) {
+    if (--timeout == 0) return 999;
+  }
 
   stop_tick = DWT->CYCCNT;
 
@@ -963,7 +964,8 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
       pwm = pwmMin;
 
     //     Motor_reverse_advanced(pwm);
-    Motor_reverse(pwm);
+    // Motor_reverse(pwm);
+    Motor_reverse_simple(pwm, pwm);
 
     // Display progress
     // snprintf(buf, sizeof(buf), "R Dist: %.1f/%.1fcm", cm_now, target_cm);
@@ -1024,6 +1026,7 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
       current_pwm = pwmMin;
 
     Motor_forward(current_pwm);
+    HAL_Delay(50); // Delay between sensor triggers to avoid overlap/freezing
   }
 
   Motor_stop();
@@ -1152,21 +1155,10 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
   uint8_t use_distance = (target_cm_abs > 0.0f) ? 1u : 0u;
   float cm_now = 0.0f;
 
-  //     float gyro_bias = 0;
-  // for(int i = 0; i < 10; i++) {
-  //     int16_t ax, ay, az, gx, gy, gz;
-  //     ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
-  //     gyro_bias += gz / 131.0f; // Convert to dps
-  //     HAL_Delay(10);
-  // }
-  // gyro_bias /= 10.0f;
-  // Calibrate gyro bias handled globally in main/init
-  // If you want to recalibrate here, you should update the GLOBAL `gyro_z_bias`
-  // but typically one calibration at startup is enough.
-  // For now, we will rely on Update_Yaw using the global bias.
+
 
   // Set steering angle gradually for safety
-  Servo_SetAngle_Safe(steer_angle, 1); // gradual movement
+  Servo_SetAngle_Safe(steer_angle, 0); // gradual movement
   HAL_Delay(100);                      // let servo settle
 
   // Capture time JUST before loop starts to exclude servo movement time
@@ -1213,9 +1205,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     float progress = fmaxf(angle_progress, dist_progress);
     int current_pwm = pwmVal;
 
-    if (progress > 0.95f) {
-      current_pwm = pwmMin; // Final crawl
-    } else if (progress > 0.85f) {
+    if (progress > 0.85f) {
       current_pwm = (int)(pwmVal * 0.3f);
     } else if (progress > 0.7f) {
       current_pwm = (int)(pwmVal * 0.6f);
@@ -1275,10 +1265,10 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
     //            snprintf(buf, sizeof(buf), "Yaw: %.1f° Target: %.1f°",
     //            yaw_angle, target_deg_abs);
     //            }
-    snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f", abs_yaw,
-             target_deg_abs, cm_now, target_cm_abs);
-    OLED_ShowString(0, 30, (uint8_t *)buf);
-    OLED_Refresh_Gram();
+    // snprintf(buf, sizeof(buf), "Yaw %.1f/%.1f Dist %.1f/%.1f", abs_yaw,
+    //          target_deg_abs, cm_now, target_cm_abs);
+    // OLED_ShowString(0, 30, (uint8_t *)buf);
+    // OLED_Refresh_Gram();
     // }
 
     HAL_Delay(5); // Faster loop frequency (200Hz)
@@ -1287,7 +1277,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
   HAL_Delay(50);
   Motor_stop();
   Servo_SetAngle_Safe(0, 0); // gradual return to center
-  HAL_Delay(100);
+  HAL_Delay(50);
 
   // Final position feedback
   //    if (use_distance) {
@@ -1297,10 +1287,10 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
   //    } else {
   //        snprintf(buf, sizeof(buf), "Final: %.1f°", yaw_angle);
   //    }
-  cm_now = cm_travelled_forward();
-  snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
-  OLED_ShowString(0, 30, (uint8_t *)buf);
-  OLED_Refresh_Gram();
+  // cm_now = cm_travelled_forward();
+  // snprintf(buf, sizeof(buf), "Final Y:%.1f° D:%.1fcm", yaw_angle, cm_now);
+  // OLED_ShowString(0, 30, (uint8_t *)buf);
+  // OLED_Refresh_Gram();
 }
 
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
@@ -1485,62 +1475,87 @@ void task_two() {
 
   //find the acceptable distance to the 2nd obstacle
   float front_dist = HCSR04_Read();
+  HAL_Delay(100);
 
-  // listen to rpi for 2nd obstacle while moving
+  // SEND to rpi for 2nd obstacle while moving
   direction = '<'; // task_two_uart()
 
   if (front_dist < obs_2_clearance_distance) {
     Drive_Reverse_ToCM(obs_2_clearance_distance - front_dist, TASK2_PWM);
   }
   else if (front_dist >= obs_2_clearance_distance) {
-    Drive_Reverse_ToCM(obs_2_clearance_distance, TASK2_PWM);
+    Drive_Forward_Until_Obstacle(TASK2_PWM, obs_2_clearance_distance);
   }
 
 
 
 
   // turn according to picture (arrow)
-  // if (direction == '<') {
-  //   Turn_Car(90, TASK2_PWM, -45,
-  //            0); // values may be wrong calibrate everything below
-  //   float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
-  //   Turn_Car(180, TASK2_PWM, 45, 0);
-  //   Drive_Forward_ToCM(half_horizontal_dist * 2,
-  //                      TASK2_PWM); // may be completely off
-  //   Turn_Car(90, TASK2_PWM, 45, 0);
+  if (direction == '<') {
+    Turn_Car(90, TASK2_PWM, -45,
+             0); 
+  reset_encoders();
+  Motor_forward_reset_heading();
+  // use right IR
+  do {
+    Motor_forward(TASK2_PWM);
+    HAL_Delay(30);
+  } while(get_IR_distance_right() < 50.0f);
 
-  //   Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
-  //                          first_dist_travelled + 10,
-  //                      TASK2_PWM); // this vertical distance goes back to the
-  //                                  // starting position in the carpark, need to
-  //                                  // tune so that it stops slightly before
-  //   Turn_Car(90, TASK2_PWM, 45, 0);
-  //   Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
-  //   Turn_Car(90, TASK2_PWM, -45, 0);
+  TASK2_horizontal_dist_now += cm_travelled_forward();
+  Turn_Car(180, TASK2_PWM, 45, 0);
+  Motor_forward_reset_heading();
+    // use right IR
+  do {
+    Motor_forward(TASK2_PWM);
+    HAL_Delay(30);
+  } while (get_IR_distance_right() < 50.0f);
 
-  // } else if (direction == '>') {
-  //   Turn_Car(90, TASK2_PWM, 45,
-  //            0); // values may be wrong calibrate everything below
-  //   float half_horizontal_dist = task_two_forward_ir(TASK2_PWM, direction);
-  //   Turn_Car(90, TASK2_PWM, -45, 0);
-  //   float vertical_dist = task_two_forward_ir(TASK2_PWM, direction);
-  //   Turn_Car(90, TASK2_PWM, -45, 0);
-  //   Drive_Forward_ToCM(half_horizontal_dist * 2,
-  //                      TASK2_PWM); // may be completely off
-  //   Turn_Car(90, TASK2_PWM, -45, 0);
 
-  //   Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
-  //                          first_dist_travelled + 10,
-  //                      TASK2_PWM); // this vertical distance goes back to the
-  //                                  // starting position in the carpark, need to
-  //                                  // tune so that it stops slightly before
-  //   Turn_Car(90, TASK2_PWM, -45, 0);
-  //   Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
-  //   Turn_Car(90, TASK2_PWM, 45, 0);
-  // }
+    // Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
+    //                        first_dist_travelled + 10,
+    //                    TASK2_PWM); // this vertical distance goes back to the
+    //                                // starting position in the carpark, need to
+    //                                // tune so that it stops slightly before
+    // Turn_Car(90, TASK2_PWM, 45, 0);
+    // Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
+    // Turn_Car(90, TASK2_PWM, -45, 0);
 
-  // // Inform RPI end of task 2
-  // send_message_over("END\n");
+  } else if (direction == '>') {
+        Turn_Car(90, TASK2_PWM, 45,
+             0); 
+  reset_encoders();
+  Motor_forward_reset_heading();
+  // use left IR
+  do {
+    Motor_forward(TASK2_PWM);
+    HAL_Delay(30);
+  } while (get_IR_distance_left() < 50.0f);
+
+  TASK2_horizontal_dist_now += cm_travelled_forward();
+  Turn_Car(180, TASK2_PWM, -45, 0);
+  Motor_forward_reset_heading();
+    // use left IR
+  do {
+    Motor_forward(TASK2_PWM);
+    HAL_Delay(30);
+  } while (get_IR_distance_left() < 50.0f);
+
+
+
+    // Drive_Forward_ToCM(vertical_dist + second_dist_travelled +
+    //                        first_dist_travelled + 10,
+    //                    TASK2_PWM); // this vertical distance goes back to the
+    //                                // starting position in the carpark, need to
+    //                                // tune so that it stops slightly before
+    // Turn_Car(90, TASK2_PWM, -45, 0);
+    // Drive_Forward_ToCM(half_horizontal_dist, TASK2_PWM);
+    // Turn_Car(90, TASK2_PWM, 45, 0);
+  }
+  Motor_stop();
+
+  // Inform RPI end of task 2
+  send_message_over("END\n");
 }
 
 #define SNAP_WAIT_MS 8000 // 8 seconds to retry once
@@ -1601,6 +1616,19 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
                                char direction) {
 
   reset_encoders();
+  int first, second, third;
+  if (direction == '<') {
+    /****left */
+    first = 600;
+    second = 1150;
+    third = 950;
+  } else if (direction == '>') {
+    /****right */
+    first = 500;
+    second = 1350;
+    third = 750;
+  }
+  
 
   // CALIBRATE THIS
   const float distance_from_back_of_obs = 30;
@@ -1632,51 +1660,13 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
     Servo_SetAngle_Safe(0, 0);
 
   }
+  Motor_reverse_simple(1000,1000);
+  HAL_Delay(50);
   Motor_stop();
   TASK2_vertical_dist_now += cm_travelled_forward() + obstacle_clearance_distance + 10+ distance_from_back_of_obs;
   return;
 }
 
-float task_two_forward_ir(int speed, char direction) {
-
-  float IR_distance;
-  reset_encoders();
-
-  while (1) {
-    if (direction == '<') {
-      // if it went left it should be using right side IR sensor
-      IR_distance = get_IR_distance_right();
-
-      if (IR_distance >= 50) {
-        Motor_reverse_simple(1000, 1000);
-        HAL_Delay(50);
-        Motor_stop();
-        return cm_travelled_forward(); // may need to change if reset encoders
-                                       // does not reset ticks
-      }
-      sprintf(buf, "%.2f", IR_distance);
-
-    } else if (direction == '>') {
-      // if it went right it should be using left side IR sensor
-      IR_distance = get_IR_distance_left();
-
-      if (IR_distance >= 50) {
-        Motor_reverse_simple(1000, 1000);
-        HAL_Delay(50);
-        Motor_stop();
-        return cm_travelled_forward(); // may need to change if reset encoders
-                                       // does not reset ticks
-      }
-
-      sprintf(buf, "%.2f", IR_distance);
-    }
-
-    OLED_ShowString(0, 20, (uint8_t *)buf);
-    OLED_Refresh_Gram();
-    HAL_Delay(100);
-    Motor_forward(speed);
-  }
-}
 
 void front_back_test() {
   int delay_btw_front_back = 5000;
@@ -1716,10 +1706,7 @@ void testing() {
   // front_back_test();
   // turning_test();
 
-    task_two_clear_first_obs(3000, 40, '>');
-  
-    HAL_Delay(7000);
-    task_two_clear_first_obs(3000, 40, '<');
+
 }
 
 /* USER CODE END 0 */
@@ -1854,7 +1841,7 @@ int main(void) {
 
   /****************************START************START*************START**********************
    */
-  // task_two();
+  task_two();
 
   // uint32_t distance = HCSR04_Read();
 

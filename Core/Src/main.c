@@ -55,6 +55,8 @@ float GYRO_RIGHT_BIAS = 130.959f;
 
 // TASK 2
 #define TASK2_PWM 3000
+volatile float TASK2_vertical_dist_now = 0;
+volatile float TASK2_horizontal_dist_now = 0;
 
 float yaw_angle = 0; // global or static variable
 uint32_t last_time = 0;
@@ -275,6 +277,12 @@ void Motor_reverse_simple(int pwmValL, int pwmValR) {
 }
 
 // THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
+static uint8_t motor_forward_needs_reset = 0;
+
+void Motor_forward_reset_heading(void) {
+  motor_forward_needs_reset = 1;
+}
+
 void Motor_forward(int pwmVal) {
   // --- Static variables persist across calls ---
   static uint32_t last_time = 0;
@@ -293,9 +301,13 @@ void Motor_forward(int pwmVal) {
     dt = 0.001f; // protect against div by 0
   last_time = now;
 
-  if (!initialized) {
-    target_heading = heading; // lock current heading
+  if (!initialized || motor_forward_needs_reset) {
+    target_heading = heading; // lock current heading as new target
+    integral = 0.0f;
+    last_error = 0.0f;
+    last_time = HAL_GetTick(); // prevent dt spike after a turn
     initialized = 1;
+    motor_forward_needs_reset = 0;
   }
 
   // --- Filter gyro Z-axis (yaw rate) ---
@@ -853,7 +865,8 @@ uint32_t HCSR04_Read(void) {
   uint32_t time_us = pulse_length / (SystemCoreClock / 1000000);
 
   // Distance (cm) = (time_us * 0.0343) / 2
-  return (uint32_t)((time_us * 346) / 20000); // 346 m/s = speed of sound at 25°C
+  return (uint32_t)((time_us * 346) /
+                    20000); // 346 m/s = speed of sound at 25°C
 }
 
 #define STRAIGHT_KP 0.8f  // Proportional gain for steering correction

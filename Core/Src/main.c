@@ -137,7 +137,7 @@ void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
 void task_two_clear_first_obs(int pwm, float first_obs_dist, char direction);
-void Drive_Forward_Until_Obstacle(int base_pwm, uint32_t obstacle_threshold_cm);
+void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
@@ -872,6 +872,7 @@ uint32_t HCSR04_Read(void) {
 
 void Drive_Forward_ToCM(float target_cm, int base_pwm) {
   reset_encoders();
+  Motor_forward_reset_heading();
 
   if (base_pwm < pwmMin)
     base_pwm = pwmMin;
@@ -881,14 +882,14 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
   while (1) {
     //     Emergency stop for obstacles
-    if (HCSR04_Read() <= 15) {
-      // Motor_stop();
-      OLED_ShowString(0, 30, "Obstacle detected!");
-      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
-      HAL_Delay(1000);
-      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
-      // break;
-    }
+    // if (HCSR04_Read() <= 15) {
+    //   // Motor_stop();
+    //   OLED_ShowString(0, 30, "Obstacle detected!");
+    //   HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET);
+    //   HAL_Delay(1000);
+    //   HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET);
+    //   // break;
+    // }
 
     float cm_now = cm_travelled_forward();
     float cm_left = target_cm - cm_now;
@@ -912,15 +913,15 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
     Motor_forward(pwm); // feb 23
 
     // Display progress
-    snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 10, (uint8_t *)buf);
-    // show left encoder ticks for debugging
-    int32_t l = left_ticks_forward();
-    int32_t r = right_ticks_forward();
-    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    OLED_ShowString(0, 20, (uint8_t *)buf);
+    // snprintf(buf, sizeof(buf), "Dist: %.1f/%.1fcm", cm_now, target_cm);
+    // OLED_ShowString(0, 10, (uint8_t *)buf);
+    // // show left encoder ticks for debugging
+    // int32_t l = left_ticks_forward();
+    // int32_t r = right_ticks_forward();
+    // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    // OLED_ShowString(0, 20, (uint8_t *)buf);
 
-    OLED_Refresh_Gram();
+    // OLED_Refresh_Gram();
 
     // 4600 ticks approximately for left for 62cm, so 74 for left!?
     // 457_ for 57 cm, left, so 80.31
@@ -933,6 +934,7 @@ void Drive_Forward_ToCM(float target_cm, int base_pwm) {
 
 void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
   reset_encoders();
+  Motor_forward_reset_heading();
 
   if (base_pwm < pwmMin)
     base_pwm = pwmMin;
@@ -964,18 +966,18 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
     Motor_reverse(pwm);
 
     // Display progress
-    snprintf(buf, sizeof(buf), "R Dist: %.1f/%.1fcm", cm_now, target_cm);
-    OLED_ShowString(0, 30, (uint8_t *)buf);
-    // // show left encoder ticks for debugging
-    int32_t l = left_ticks_reverse();
-    int32_t r = right_ticks_reverse();
-    snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
-    OLED_ShowString(0, 40, (uint8_t *)buf);
+    // snprintf(buf, sizeof(buf), "R Dist: %.1f/%.1fcm", cm_now, target_cm);
+    // OLED_ShowString(0, 30, (uint8_t *)buf);
+    // // // show left encoder ticks for debugging
+    // int32_t l = left_ticks_reverse();
+    // int32_t r = right_ticks_reverse();
+    // snprintf(buf, sizeof(buf), "L:%ld R:%ld", (long)l, (long)r);
+    // OLED_ShowString(0, 40, (uint8_t *)buf);
 
     // Display progress
     // snprintf(buf, sizeof(buf), "Rev: %.1f/%.1fcm", cm_now, target_cm);
     // OLED_ShowString(0, 10, (uint8_t *)buf);
-    OLED_Refresh_Gram();
+    // OLED_Refresh_Gram();
   }
   Motor_forward_simple(1000, 1000);
   HAL_Delay(50);
@@ -983,56 +985,48 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
   HAL_Delay(1000);
 }
 
-void Drive_Forward_Until_Obstacle(int base_pwm,
-                                  uint32_t obstacle_threshold_cm) {
-  // Safety check on parameters
-  if (base_pwm < pwmMin)
-    base_pwm = pwmMin;
-  if (base_pwm > pwmMax)
-    base_pwm = pwmMax;
-  if (obstacle_threshold_cm < 5)
-    obstacle_threshold_cm = 5; // Minimum 5cm safety
-  if (obstacle_threshold_cm > 50)
-    obstacle_threshold_cm = 50; // Maximum 50cm range
+void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
+  Motor_forward_reset_heading();
 
-  reset_encoders();
+  float first, second, third;
+  float current_pwm = pwm;
 
-  // Display initial status
-  sprintf(buf, "Moving forward...");
-  OLED_ShowString(0, 00, (uint8_t *)buf);
-  OLED_Refresh_Gram();
+  if (direction == '<') {
+    /****left */
+    first = 600;
+    second = 1150;
+    third = 950;
+  } else if (direction == '>') {
+    /****right */
+    first = 500;
+    second = 1350;
+    third = 750;
+  }
 
+  // forward for some distance
   while (1) {
-    // Read distance from ultrasonic sensor
-    uint32_t distance = HCSR04_Read();
 
-    // Display current distance
-    sprintf(buf, "Dist: %lu cm", distance);
-    OLED_ShowString(0, 10, (uint8_t *)buf);
-    OLED_Refresh_Gram();
+    float cm_left = HCSR04_Read() - obstacle_clearance_distance;
 
-    // Check if obstacle is detected
-    if (distance <= obstacle_threshold_cm) {
-      // Stop immediately when obstacle detected
-      Motor_stop();
-
-      // Provide feedback
-      sprintf(buf, "Obstacle at %lu cm!", distance);
-      OLED_ShowString(0, 20, (uint8_t *)buf);
-      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_SET); // Alert buzzer
-      OLED_Refresh_Gram();
-
-      HAL_Delay(500);                                       // Brief pause
-      HAL_GPIO_WritePin(GPIOA, Buzzer_Pin, GPIO_PIN_RESET); // Turn off buzzer
+    if (cm_left <= 0)
       break;
+
+    // Speed ramping
+    if (cm_left < 5) {
+      current_pwm = (int)(pwm * 0.2f); // Final crawl
+    } else if (cm_left < 10) {
+      current_pwm = (int)(pwm * 0.3f);
+    } else if (cm_left < 15) {
+      current_pwm = (int)(pwm * 0.6f);
     }
 
-    // Continue moving forward
-    Motor_forward(base_pwm);
+    if (current_pwm < pwmMin)
+      current_pwm = pwmMin;
 
-    // Small delay for sensor reading stability
-    HAL_Delay(50);
+    Motor_forward(current_pwm);
   }
+
+  Motor_stop();
 }
 void Reset_Yaw_Integration(void) {
   yaw_angle = 0.0f;
@@ -1475,23 +1469,35 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 void task_two() {
   send_message_over("ACK\n");
   // define vars
-  float obstacle_clearance_distance =
-      30.0f; // need to calibrate actual distance
+  // at least 40cm clearance to go around obstacle at 3000PWM
+  float obs_1_clearance_distance = 40.0f;
+
+  // at least 20cm clearance to turn
+  float obs_2_clearance_distance = 20.0f;
+
 
   // listen to rpi for 1st obstacle
   char direction = '<'; // task_two_uart()
 
   // drive around 1st obstacle
-    // task_two_clear_first_obs(
-    //   TASK2_PWM, obstacle_clearance_distance, direction);
+    task_two_clear_first_obs(
+      TASK2_PWM, obs_1_clearance_distance, direction);
 
-  TASK2_vertical_dist_now = cm_travelled_forward();
+  //find the acceptable distance to the 2nd obstacle
+  float front_dist = HCSR04_Read();
 
-  float second_dist_travelled =
-      task_two_forward_to_obstacle(TASK2_PWM, obstacle_clearance_distance);
-
-  // listen to rpi for 2nd obstacle
+  // listen to rpi for 2nd obstacle while moving
   direction = '<'; // task_two_uart()
+
+  if (front_dist < obs_2_clearance_distance) {
+    Drive_Reverse_ToCM(obs_2_clearance_distance - front_dist, TASK2_PWM);
+  }
+  else if (front_dist >= obs_2_clearance_distance) {
+    Drive_Reverse_ToCM(obs_2_clearance_distance, TASK2_PWM);
+  }
+
+
+
 
   // turn according to picture (arrow)
   // if (direction == '<') {
@@ -1585,6 +1591,8 @@ char task_two_uart() {
   send_message_over("timeout\n");
   return 0;
 }
+
+
 /**
 Updates: TASK2_vertical_dist_now SIDE AFFECT
  */
@@ -1593,49 +1601,11 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
                                char direction) {
 
   reset_encoders();
-  Motor_forward_reset_heading();
 
-  float first, second, third;
-  float current_pwm = pwm;
   // CALIBRATE THIS
   const float distance_from_back_of_obs = 30;
 
-  if (direction == '<') {
-    /****left */
-    first = 600;
-    second = 1150;
-    third = 950;
-  } else if (direction == '>') {
-    /****right */
-    first = 500;
-    second = 1350;
-    third = 750;
-  }
-
-  // forward for some distance
-  while (1) {
-
-    float cm_left = HCSR04_Read() - obstacle_clearance_distance;
-
-    if (cm_left <= 0)
-      break;
-
-    // Speed ramping
-    if (cm_left < 5) {
-      current_pwm = (int)(pwm * 0.2f); // Final crawl
-    } else if (cm_left < 10) {
-      current_pwm = (int)(pwm * 0.3f);
-    } else if (cm_left < 15) {
-      current_pwm = (int)(pwm * 0.6f);
-    }
-
-    if (current_pwm < pwmMin)
-      current_pwm = pwmMin;
-
-    Motor_forward(current_pwm);
-  }
-
-  Motor_stop();
+  Drive_Forward_Until_Obstacle(pwm, obstacle_clearance_distance);
 
   // no stop, turn and continue, HARDCODED
   if (direction == '<') {

@@ -138,10 +138,6 @@ void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
 void Drive_Forward_Until_Obstacle(int speed);
-void cmd_turn_left(float target_cm);
-void cmd_turn_right(float target_cm);
-void cmd_turn_left_reverse(float target_cm);
-void cmd_turn_right_reverse(float target_cm);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
@@ -453,6 +449,7 @@ void Motor_reverse(int pwmVal) {
   // sprintf(buf, "PWM = %4dR ", pwmVal);
   // OLED_ShowString(0, 20, buf);
 }
+
 
 void serial_uart() {
   // send various values to serial port @ usart 3 for display
@@ -785,6 +782,26 @@ int ICM20948_Init(void) {
   ICM20948_WriteReg(2, 0x02, 0x03); // Setting DLPFCFG = 3 (51.2Hz BW)
 
   return 0;
+}
+
+float get_IR_distance_right(){
+        // IR6 PA6 = ADC1_IN6 (right sensor)
+
+        raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
+      mv6 = (uint32_t)raw6 * 3300u / 4095u;
+      dist6 = dist_cm_from_mv_6(mv6);
+      return dist6;
+
+}
+
+
+float get_IR_distance_left(){
+        // IR7 PA7 = ADC1_IN7 (left sensor)
+
+      raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
+      mv7 = (uint32_t)raw7 * 3300u / 4095u;
+      dist7 = dist_cm_from_mv_7(mv7);
+      return dist7;
 }
 
 // Read raw accel/gyro
@@ -1612,32 +1629,29 @@ float task_two_forward_to_obstacle(int speed,
 }
 
 float task_two_forward_ir(int speed, char direction) {
+
+  float IR_distance;
   reset_encoders();
 
   while (1) {
     if (direction == '<') {
-      // IR6 PA6 = ADC1_IN6 (right sensor)
-      raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
-      mv6 = (uint32_t)raw6 * 3300u / 4095u;
-      dist6 = dist_cm_from_mv_6(mv6);
+      // if it went left it should be using right side IR sensor
+      IR_distance = get_IR_distance_right();
 
-
-      if (dist6 >= 50) {
+      if (IR_distance >= 50) {
         Motor_reverse_simple(1000, 1000);
         HAL_Delay(50);
         Motor_stop();
         return cm_travelled_forward(); // may need to change if reset encoders
                                        // does not reset ticks
       }
-      sprintf(buf, "%.2f", dist6);
+      sprintf(buf, "%.2f", IR_distance);
 
     } else if (direction == '>') {
-      // IR7 PA7 = ADC1_IN7 (left sensor)
-      raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
-      mv7 = (uint32_t)raw7 * 3300u / 4095u;
-      dist7 = dist_cm_from_mv_7(mv7);
+      // if it went right it should be using left side IR sensor
+      IR_distance = get_IR_distance_left();
 
-      if (dist7 >= 50) {
+      if (IR_distance >= 50) {
         Motor_reverse_simple(1000, 1000);
         HAL_Delay(50);
         Motor_stop();
@@ -1645,7 +1659,7 @@ float task_two_forward_ir(int speed, char direction) {
                                        // does not reset ticks
       }
 
-      sprintf(buf, "%.2f", dist7);
+      sprintf(buf, "%.2f", IR_distance);
     }
   
 
@@ -1853,22 +1867,6 @@ int main(void) {
 
 
   /******** IR Sensor Code *******************************************/
-  // while (1){
-  //     // IR6 PA6 = ADC1_IN6
-  //     raw6 = adc_read_channel(&hadc1, ADC_CHANNEL_6);
-  //     mv6  = (uint32_t)raw6 * 3300u / 4095u;
-  //     dist6 = dist_cm_from_mv_6(mv6);
-
-  //     // IR7 PA7 = ADC1_IN7
-  //     raw7 = adc_read_channel(&hadc1, ADC_CHANNEL_7);
-  //     mv7  = (uint32_t)raw7 * 3300u / 4095u;
-  //     dist7 = dist_cm_from_mv_7(mv7);
-
-  //     sprintf(buf, "IR6 = %.2f cm | IR7 = %.2f cm\r\n", dist6, dist7);
-  //     OLED_ShowString(0, 20, (uint8_t*)buf);
-  //     OLED_Refresh_Gram();
-  //     HAL_Delay(100);
-  // }
   /******** IR Sensor Code END ************************/
 
   /* USER CODE END WHILE */

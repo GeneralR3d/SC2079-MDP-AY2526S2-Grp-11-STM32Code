@@ -19,6 +19,7 @@ UART_HandleTypeDef huart3;
 
 // VARIABLES FOR TASK 2
 #define TASK2_PWM 3000
+#define SNAP_WAIT_MS 8000 // 8 seconds to retry once
 float obs_1_clearance_distance = 40.0f;
 float obs_2_clearance_distance = 20.0f;
 
@@ -1547,7 +1548,7 @@ void task_two() {
   send_message_over("END\n");
 }
 
-#define SNAP_WAIT_MS 8000 // 8 seconds to retry once
+
 
 char task_two_uart() {
 

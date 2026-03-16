@@ -1614,7 +1614,7 @@ void task_two_return_to_start(char current_direction) {
   reset_encoders();
 
   // Drive forward until arc point
-  Drive_Forward_ToCM(TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer, TASK2_PWM);
+  Drive_Forward_ToCM(TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer, TASK2_RETURN_PWM);
 
   // Perpencidular to carpark
   if(current_direction == '>') {
@@ -1629,14 +1629,14 @@ void task_two_return_to_start(char current_direction) {
 
   // Reverse until carpark wall is found
   do {
-    Motor_reverse_simple(TASK2_PWM, TASK2_PWM);
+    Motor_reverse_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
     HAL_Delay(30);  // polling rate for IR sensor
   } while ((current_direction == '>' && get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) || (current_direction == '<' && get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
   Motor_stop();
 
   // Go forward again until carpark wall is gone
   do {
-    Motor_forward_simple(TASK2_PWM, TASK2_PWM);
+    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
     HAL_Delay(30);  // polling rate for IR sensor
   } while ((current_direction == '>' && get_IR_distance_left() < TASK2_carpark_side_IR_distance_threshold) || (current_direction == '<' && get_IR_distance_right() < TASK2_carpark_side_IR_distance_threshold));
   Motor_stop();
@@ -1650,7 +1650,7 @@ void task_two_return_to_start(char current_direction) {
   // Return straight
   reset_encoders();
   Motor_forward_reset_heading();
-  Drive_Forward_Until_Obstacle(TASK2_PWM, TASK2_carpark_wall_clearance_distance);
+  Drive_Forward_Until_Obstacle(TASK2_RETURN_PWM, TASK2_carpark_wall_clearance_distance);
   Motor_stop();
 }
 

@@ -19,6 +19,7 @@ UART_HandleTypeDef huart3;
 
 // VARIABLES FOR TASK 2
 #define TASK2_PWM 3000
+#define TASK2_RETURN_PWM 4500
 #define SNAP_WAIT_MS 8000 // 8 seconds to retry once
 
 // TASK 2 - LEG 1
@@ -28,11 +29,11 @@ const float TASK2_distance_from_back_of_first_obs = 30.0f;
 const float TASK2_obs_2_clearance_distance = 20.0f;
 
 // TASK 2 - RETURN TO START
-const float TASK2_distance_from_back_of_second_obs = 30.0f;
-const float TASK2_obstacle2_thickness = 10.0f;
+const float TASK2_distance_from_back_of_second_obs = 10.0f;
 const float TASK2_carpark_side_IR_distance_threshold = 50.0f;
+
 // Safe threshold for vertical distance travelled before arcing
-const float  TASK2_vertical_dist_return_arc_threshold = 100.0f; 
+const float TASK2_vertical_dist_return_arc_buffer = 120.0f; 
 // Final brake
 const float TASK2_carpark_wall_clearance_distance = 40.0f;
 
@@ -80,9 +81,6 @@ float GYRO_RIGHT_BIAS = 130.959f;
 
 
 float yaw_angle = 0; // global or static variable
-volatile float absolute_yaw = 0.0f;
-float locked_heading_main = 0.0f;
-float locked_heading_180 = 0.0f;
 uint32_t last_time = 0;
 float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
 
@@ -165,8 +163,6 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
-void Lock_Heading(void);
-void correct_To_Locked_Heading(int pwmVal, uint8_t use_180);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two();
 void task_two_return_to_start(char previousDirection);
@@ -1113,14 +1109,7 @@ void Update_Yaw(void) {
       alpha * gz_dps_corrected + (1.0f - alpha) * gyro_gz_filtered;
 
   // Trapezoidal integration for better precision
-  float delta_angle = (gyro_gz_prev + gz_dps_corrected) * 0.5f * dt;
-  yaw_angle += delta_angle;
-  
-  absolute_yaw += delta_angle;
-  // Normalize absolute_yaw to [-180, 180]
-  if (absolute_yaw > 180.0f) absolute_yaw -= 360.0f;
-  if (absolute_yaw < -180.0f) absolute_yaw += 360.0f;
-
+  yaw_angle += (gyro_gz_prev + gz_dps_corrected) * 0.5f * dt;
   gyro_gz_prev = gz_dps_corrected;
 }
 
@@ -1487,107 +1476,14 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
   OLED_Refresh_Gram();
 }
 
-void Lock_Heading(void) {
-  locked_heading_main = absolute_yaw;
-
-  locked_heading_180 = absolute_yaw + 180.0f;
-  if (locked_heading_180 > 180.0f) locked_heading_180 -= 360.0f;
-  if (locked_heading_180 < -180.0f) locked_heading_180 += 360.0f;
-}
-
-void correct_To_Locked_Heading(int pwmVal, uint8_t use_180) {
-  gyro_gz_filtered = 0; // reset filter memory
-
-  // Shortest path error determines direction and the absolute required sweep distance
-  float target_h = use_180 ? locked_heading_180 : locked_heading_main;
-  float initial_error = target_h - absolute_yaw;
-  if (initial_error > 180.0f) initial_error -= 360.0f;
-  if (initial_error < -180.0f) initial_error += 360.0f;
-  
-  float abs_target_sweep = fabsf(initial_error);
-  // Guarantee a full 180 turn if the flag is specifically requested
-  if (use_180 && abs_target_sweep < 170.0f) {
-      abs_target_sweep = 180.0f;
-  }
-
-
-  // Wait a tiny bit and throw away early gyro baggage so we don't start loop with wrong error delta
-  last_time = HAL_GetTick(); 
-  uint32_t start_time = HAL_GetTick();
-  const uint32_t timeout_ms = 8000;
-  
-  // Re-read absolute_yaw right before we start integrating so we don't lose the movement that happened during HAL_Delay(100)
-  Update_Yaw(); 
-  float initial_yaw = absolute_yaw;
-  float total_absolute_swept = 0.0f;
-
-  while (1) {
-    uint32_t loop_tick = HAL_GetTick();
-    if (loop_tick - start_time > timeout_ms)
-      break;
-
-    Update_Yaw();
-
-    // Shortest path error calculation
-    float error = target_h - absolute_yaw;
-    if (error > 180.0f) error -= 360.0f;
-    if (error < -180.0f) error += 360.0f;
-
-    // Check if we've reached the target within tolerance
-    if (loop_tick - start_time > 100) { 
-        if (fabsf(error) < 1.5f) {
-            break;
-        }
-
-        // Overshoot catch: If error flips sign, we crossed the target boundary
-        // We only check for this if we are extremely close to the target (e.g. error < 20 deg)
-        // to avoid triggering when the error wraps between +180 and -180 on the opposite side.
-        if (fabsf(error) < 20.0f) {
-            if (initial_error > 0.0f && error <= 0.0f) break;
-            if (initial_error < 0.0f && error >= 0.0f) break;
-        }
-    }
-
-    // --- Spin on the spot: drive wheels in opposite directions ---
-    // Gyro Polarity: Left turns make absolute_yaw POSITIVE. Right turns make it NEGATIVE.
-    int pwm_left, pwm_right;
-
-    if (initial_error > 0.0f) {
-      // We need to increase yaw (Turn Left)
-      // Motor A (left) reverse: PWM on CH3 = 0, CH4 = pwmVal
-      __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
-      __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, pwmVal);
-
-      // Motor D (right) forward: PWM on CH4 = pwmVal, CH3 = 0
-      __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
-      __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, pwmVal);
-    } else {
-      // We need to decrease yaw (Turn Right)
-      // Motor A (left) forward: PWM on CH3, CH4 = 0
-      __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal);
-      __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
-
-      // Motor D (right) backward: PWM on CH3 = pwmVal, CH4 = 0
-      __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmVal);
-      __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
-    }
-    
-    HAL_Delay(10); // Loop delay
-  }
-
-  // Final brake
-  Motor_reverse_simple(1000, 1000);
-  HAL_Delay(50);
-  Motor_stop();
-  HAL_Delay(50);
-}
-
 void task_two() {
+
   send_message_over("ACK\n");
-  // define vars
-  // at least 40cm clearance to go around obstacle at 3000PWM
-  // at least 20cm clearance to turn
-  Lock_Heading();
+
+
+  // Reset tracked distances
+  TASK2_vertical_dist_now = 0;
+  TASK2_horizontal_dist_now = 0;
 
   // listen to rpi for 1st obstacle
   char direction = '<'; // task_two_uart()
@@ -1608,15 +1504,11 @@ void task_two() {
   // Back up / move forward until 2nd obstacle is within clearance distance
   if (front_dist < TASK2_obs_2_clearance_distance) {
     Drive_Reverse_ToCM(TASK2_obs_2_clearance_distance - front_dist, TASK2_PWM);
+    TASK2_vertical_dist_now -= cm_travelled_reverse();
   } else if (front_dist >= TASK2_obs_2_clearance_distance) {
     Drive_Forward_Until_Obstacle(TASK2_PWM, TASK2_obs_2_clearance_distance);
+    TASK2_vertical_dist_now += cm_travelled_forward();
   }
-
-  // Turn using the 180 locked heading
-  // correct_To_Locked_Heading(TASK2_PWM, 0);
-
-  // Now car is facing obstacle 2 arrow
-  TASK2_vertical_dist_now += cm_travelled_forward();
 
   // turn according to picture (arrow)
   if (direction == '<') {
@@ -1686,7 +1578,7 @@ void task_two() {
     // Turn_Car(90, TASK2_PWM, 45, 0);
   }
   Motor_stop();
-  task_two_return_to_start(direction == '<' ? '>' : '<');
+  task_two_return_to_start(previous_direction == '<' ? '>' : '<');
 
 
 
@@ -1695,10 +1587,21 @@ void task_two() {
   send_message_over("END\n");
 }
 
+void task_two_print_stats() {
+  char buf[100];
+  snprintf(buf, sizeof(buf), "V:%.1f", TASK2_vertical_dist_now);
+  //snprintf(buf, sizeof(buf), "V:%.1f H:%.1f", TASK2_vertical_dist_now, TASK2_horizontal_dist_now);
+  OLED_ShowString(0, 30, (uint8_t *)buf);
+  OLED_Refresh_Gram();
+  HAL_Delay(1000);
+}
+
 void task_two_return_to_start(char current_direction) {
 
-  TASK2_vertical_dist_now += TASK2_obs_2_clearance_distance + TASK2_obstacle2_thickness + TASK2_distance_from_back_of_second_obs;
- 
+  TASK2_vertical_dist_now += TASK2_obs_2_clearance_distance + TASK2_distance_from_back_of_second_obs;
+  task_two_print_stats();
+
+  
   // Wall is on the right, turn right
   if (current_direction == '>') {
     Turn_Car(90, TASK2_PWM, 45, 0);
@@ -1707,13 +1610,11 @@ void task_two_return_to_start(char current_direction) {
     Turn_Car(90, TASK2_PWM, -45, 0);
   }
 
-  correct_To_Locked_Heading(TASK2_PWM, 1);
-
   // Move straight until clear
   reset_encoders();
 
   // Drive forward until arc point
-  Drive_Forward_ToCM(TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_threshold, TASK2_PWM);
+  Drive_Forward_ToCM(TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer, TASK2_PWM);
 
   // Perpencidular to carpark
   if(current_direction == '>') {
@@ -1721,6 +1622,7 @@ void task_two_return_to_start(char current_direction) {
   } else if(current_direction == '<') {
     Turn_Car(90, TASK2_PWM, -45, 0);
   }
+
 
   // Use IR to find carpark wall
   // Should be on the opposite side of the arc direction (arc right , wall on the left)
@@ -1894,7 +1796,6 @@ void testing() {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
-
 }
 
 /* USER CODE END 0 */

@@ -1745,6 +1745,48 @@ void task_two_return_to_start(char current_direction) {
   Motor_stop();
 }
 
+
+
+void Turn_Right90_Straight_Left90_Fast(int pwm, uint32_t turn_ms, uint32_t straight_ms) {
+  // Right 90
+  Servo_SetAngle_Safe(45, 0);   // steer right
+  HAL_Delay(50);                // servo settle
+  Motor_forward_simple(pwm, pwm);
+  HAL_Delay(turn_ms);           // calibrate: ~600–1200 ms for 90° arc
+  // Straight
+  Servo_SetAngle_Safe(0, 0);
+  HAL_Delay(50);
+  Motor_forward_simple(pwm, pwm);
+  HAL_Delay(straight_ms);       // how far you want to go
+  // Left 90
+  Servo_SetAngle_Safe(-45, 0);
+  HAL_Delay(50);
+  Motor_forward_simple(pwm, pwm);
+  HAL_Delay(turn_ms);
+  Motor_stop();
+  Servo_SetAngle_Safe(0, 0);
+}
+
+void Turn_Left90_Straight_Right90_Fast(int pwm, uint32_t turn_ms, uint32_t straight_ms) {
+  // Right 90
+  Servo_SetAngle_Safe(-45, 0);   // steer right
+  HAL_Delay(50);                // servo settle
+  Motor_forward_simple(pwm, pwm);
+  HAL_Delay(turn_ms);           // calibrate: ~600–1200 ms for 90° arc
+  // Straight
+  Servo_SetAngle_Safe(0, 0);
+  HAL_Delay(50);
+  Motor_forward_simple(pwm, pwm);
+  HAL_Delay(straight_ms);       // how far you want to go
+  // Left 90
+  Servo_SetAngle_Safe(45, 0);
+  HAL_Delay(50);
+  Motor_forward_simple(pwm, pwm);
+  HAL_Delay(turn_ms);
+  Motor_stop();
+  Servo_SetAngle_Safe(0, 0);
+}
+
 void task_two_return_to_start_alternate(char current_direction) {
   TASK2_vertical_dist_now +=
       TASK2_obs_2_clearance_distance + TASK2_distance_from_back_of_second_obs;
@@ -1771,38 +1813,39 @@ void task_two_return_to_start_alternate(char current_direction) {
   int first, second, third;
 
   if (current_direction == '>') {
+    Turn_Right90_Straight_Left90_Fast(TASK2_RETURN_PWM, 600, 1250);
+    // first = 600;
+    // second = 1250;
+    // third = 950;
 
-    first = 600;
-    second = 1250;
-    third = 950;
-
-    Servo_SetAngle_Safe(45, 0);
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-    HAL_Delay(first);
-    Servo_SetAngle_Safe(-45, 0);
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-    HAL_Delay(second);
-    Servo_SetAngle_Safe(45, 0);
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-    HAL_Delay(third);
-    Servo_SetAngle_Safe(0, 0);
+    // Servo_SetAngle_Safe(45, 0);
+    // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    // HAL_Delay(first);
+    // Servo_SetAngle_Safe(-45, 0);
+    // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    // HAL_Delay(second);
+    // Servo_SetAngle_Safe(45, 0);
+    // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    // HAL_Delay(third);
+    // Servo_SetAngle_Safe(0, 0);
 
   } else if (current_direction == '<') {
 
-    first = 500;
-    second = 1350;
-    third = 750;
+    Turn_Left90_Straight_Right90_Fast(TASK2_RETURN_PWM, 500, 1350);
+    // first = 500;
+    // second = 1350;
+    // third = 750;
 
-    Servo_SetAngle_Safe(-45, 0);
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-    HAL_Delay(first);
-    Servo_SetAngle_Safe(45, 0);
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-    HAL_Delay(second);
-    Servo_SetAngle_Safe(-45, 0);
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-    HAL_Delay(third);
-    Servo_SetAngle_Safe(0, 0);
+    // Servo_SetAngle_Safe(-45, 0);
+    // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    // HAL_Delay(first);
+    // Servo_SetAngle_Safe(45, 0);
+    // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    // HAL_Delay(second);
+    // Servo_SetAngle_Safe(-45, 0);
+    // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    // HAL_Delay(third);
+    // Servo_SetAngle_Safe(0, 0);
   }
 
   Motor_reverse_simple(1000, 1000);
@@ -1814,6 +1857,8 @@ void task_two_return_to_start_alternate(char current_direction) {
                                TASK2_carpark_wall_clearance_distance);
   Motor_stop();
 }
+
+
 
 char task_two_uart() {
 

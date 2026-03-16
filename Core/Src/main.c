@@ -32,6 +32,13 @@ const float TASK2_obs_2_clearance_distance = 20.0f;
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
 const float TASK2_carpark_side_IR_distance_threshold = 25.0f;
 
+typedef enum {
+  TASK2_SURFACE_HPL,
+  TASK2_SURFACE_OUTSIDE,
+  TASK2_SURFACE_ELSON_ROOM,
+} TASK2_Surface_t;
+TASK2_Surface_t TASK2_current_surface = TASK2_SURFACE_ELSON_ROOM;
+
 // Safe threshold for vertical distance travelled before arcing , measured dist
 // is 400 400 - 120 = 280 400 - 150 = 250
 //
@@ -1315,8 +1322,7 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm) {
 
     // if (progress > 0.90f) {
     //   current_pwm = (int)(pwmVal * 0.5f);
-    // } 
-    
+    // }
 
     if (progress > 0.85f) {
       current_pwm = (int)(pwmVal * 0.4f);
@@ -1569,6 +1575,29 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
   OLED_Refresh_Gram();
 }
 
+bool task_two_second_obs_check() {
+  // find the acceptable distance to the 2nd obstacle
+  reset_encoders();
+  float front_dist = HCSR04_Read();
+  HAL_Delay(100);
+
+  // SEND to rpi for 2nd obstacle while moving
+  char direction_obs2 = '<'; // task_two_uart()
+
+  // Back up / move forward until 2nd obstacle is within clearance distance
+  if (front_dist < TASK2_obs_2_clearance_distance) {
+    Drive_Reverse_ToCM_Set_Delay(TASK2_obs_2_clearance_distance - front_dist,
+                                 TASK2_PWM, 100);
+    TASK2_vertical_dist_now -= cm_travelled_reverse();
+    return false;
+  } else if (front_dist >= TASK2_obs_2_clearance_distance) {
+    Drive_Forward_Until_Obstacle(TASK2_PWM, TASK2_obs_2_clearance_distance);
+    TASK2_vertical_dist_now += cm_travelled_forward();
+    return true;
+  }
+  return true;
+}
+
 void task_two() {
 
   send_message_over("ACK\n");
@@ -1584,24 +1613,7 @@ void task_two() {
   task_two_clear_first_obs(TASK2_PWM, TASK2_obs_1_clearance_distance,
                            direction_obs1);
 
-  // find the acceptable distance to the 2nd obstacle
-  float front_dist = HCSR04_Read();
-  HAL_Delay(100);
-
-  // SEND to rpi for 2nd obstacle while moving
-  char direction_obs2 = '<'; // task_two_uart()
-
-  reset_encoders();
-
-  // Back up / move forward until 2nd obstacle is within clearance distance
-  if (front_dist < TASK2_obs_2_clearance_distance) {
-    Drive_Reverse_ToCM_Set_Delay(TASK2_obs_2_clearance_distance - front_dist,
-                                 TASK2_PWM, 100);
-    TASK2_vertical_dist_now -= cm_travelled_reverse();
-  } else if (front_dist >= TASK2_obs_2_clearance_distance) {
-    Drive_Forward_Until_Obstacle(TASK2_PWM, TASK2_obs_2_clearance_distance);
-    TASK2_vertical_dist_now += cm_travelled_forward();
-  }
+  task_two_second_obs_check();
 
   // turn according to picture (arrow)
   if (direction_obs2 == '<') {
@@ -1614,8 +1626,6 @@ void task_two() {
       Motor_forward(TASK2_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_right() < 50.0f);
-
-    // TODO: Add wall alignment IR failsafe
 
     TASK2_horizontal_dist_now += cm_travelled_forward();
     Turn_Car(180, TASK2_PWM, 45, 0);
@@ -1641,8 +1651,6 @@ void task_two() {
       HAL_Delay(30);
     } while (get_IR_distance_left() < 50.0f);
 
-    // TODO: Add wall alignment IR failsafe
-
     TASK2_horizontal_dist_now += cm_travelled_forward();
     Turn_Car(180, TASK2_PWM, -45, 0);
     Motor_forward_reset_heading();
@@ -1658,8 +1666,8 @@ void task_two() {
     } while (get_IR_distance_left() < 50.0f);
   }
   Motor_stop();
-  //task_two_return_to_start(direction_obs2 == '<' ? '>' : '<');
-  task_two_return_to_start_alternate(direction_obs2 == '<' ? '>' : '<');
+  task_two_return_to_start(direction_obs2 == '<' ? '>' : '<');
+  //task_two_return_to_start_alternate(direction_obs2 == '<' ? '>' : '<');
   Motor_stop();
   // Inform RPI end of task 2
   send_message_over("END\n");
@@ -1745,19 +1753,18 @@ void task_two_return_to_start(char current_direction) {
   Motor_stop();
 }
 
-
-
-void Turn_Right90_Straight_Left90_Fast(int pwm, uint32_t turn_ms, uint32_t straight_ms) {
+void Turn_Right90_Straight_Left90_Fast(int pwm, uint32_t turn_ms,
+                                       uint32_t straight_ms) {
   // Right 90
-  Servo_SetAngle_Safe(45, 0);   // steer right
-  HAL_Delay(50);                // servo settle
+  Servo_SetAngle_Safe(45, 0); // steer right
+  HAL_Delay(50);              // servo settle
   Motor_forward_simple(pwm, pwm);
-  HAL_Delay(turn_ms);           // calibrate: ~600–1200 ms for 90° arc
+  HAL_Delay(turn_ms); // calibrate: ~600–1200 ms for 90° arc
   // Straight
   Servo_SetAngle_Safe(0, 0);
   HAL_Delay(50);
   Motor_forward_simple(pwm, pwm);
-  HAL_Delay(straight_ms);       // how far you want to go
+  HAL_Delay(straight_ms); // how far you want to go
   // Left 90
   Servo_SetAngle_Safe(-45, 0);
   HAL_Delay(475);
@@ -1767,17 +1774,18 @@ void Turn_Right90_Straight_Left90_Fast(int pwm, uint32_t turn_ms, uint32_t strai
   Servo_SetAngle_Safe(0, 0);
 }
 
-void Turn_Left90_Straight_Right90_Fast(int pwm, uint32_t turn_ms, uint32_t straight_ms) {
+void Turn_Left90_Straight_Right90_Fast(int pwm, uint32_t turn_ms,
+                                       uint32_t straight_ms) {
   // Right 90
-  Servo_SetAngle_Safe(-45, 0);   // steer right
-  HAL_Delay(50);                // servo settle
+  Servo_SetAngle_Safe(-45, 0); // steer right
+  HAL_Delay(50);               // servo settle
   Motor_forward_simple(pwm, pwm);
-  HAL_Delay(turn_ms);           // calibrate: ~600–1200 ms for 90° arc
+  HAL_Delay(turn_ms); // calibrate: ~600–1200 ms for 90° arc
   // Straight
   Servo_SetAngle_Safe(0, 0);
   HAL_Delay(50);
   Motor_forward_simple(pwm, pwm);
-  HAL_Delay(straight_ms);       // how far you want to go
+  HAL_Delay(straight_ms); // how far you want to go
   // Left 90
   Servo_SetAngle_Safe(45, 0);
   HAL_Delay(475);
@@ -1807,7 +1815,6 @@ void task_two_return_to_start_alternate(char current_direction) {
   Drive_Forward_ToCM_Set_Delay(TASK2_vertical_dist_now -
                                    TASK2_vertical_dist_return_arc_buffer * 1.5,
                                TASK2_RETURN_PWM, 100);
-
 
   reset_encoders();
   int first, second, third;
@@ -1857,8 +1864,6 @@ void task_two_return_to_start_alternate(char current_direction) {
                                TASK2_carpark_wall_clearance_distance);
   Motor_stop();
 }
-
-
 
 char task_two_uart() {
 
@@ -1917,19 +1922,54 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
   reset_encoders();
   int first, second, third;
   if (direction == '<') {
-    /****left */
-    first = 750;
-    second = 1200;
-    third = 950;
 
-    // first = 600;
-    // second = 1250;
-    // third = 950;
+    switch (TASK2_current_surface) {
+    case TASK2_SURFACE_HPL:
+      first = 750;
+      second = 1200;
+      third = 950;
+      break;
+    case TASK2_SURFACE_OUTSIDE:
+      first = 750;
+      second = 1200;
+      third = 950;
+      break;
+    case TASK2_SURFACE_ELSON_ROOM:
+      first = 750;
+      second = 1300;
+      third = 950;
+      break;
+    default:
+      first = 750;
+      second = 1200;
+      third = 950;
+      break;
+    }
+
   } else if (direction == '>') {
     /****right */
-    first = 500;
-    second = 1350;
-    third = 750;
+    switch (TASK2_current_surface) {
+    case TASK2_SURFACE_HPL:
+      first = 500;
+      second = 1350;
+      third = 750;
+      break;
+    case TASK2_SURFACE_OUTSIDE:
+      first = 500;
+      second = 1350;
+      third = 750;
+      break;
+    case TASK2_SURFACE_ELSON_ROOM:
+      first = 500;
+      second = 1350;
+      third = 750;
+      break;
+    default:
+      first = 500;
+      second = 1350;
+      third = 750;
+      break;
+    }
   }
 
   Drive_Forward_Until_Obstacle(pwm, obstacle_clearance_distance);
@@ -1941,11 +1981,18 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
     HAL_Delay(first);
     Servo_SetAngle_Safe(45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(second);
+    HAL_Delay(second * 0.5);
+
     Servo_SetAngle_Safe(-45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(third);
+    HAL_Delay(third * 0.20);
+    // If wall is too close, already -> early out
+    if (task_two_second_obs_check()) {
+      Motor_forward_simple(pwm, pwm);
+      HAL_Delay(third * 0.80);
+    }
     Servo_SetAngle_Safe(0, 0);
+
   } else if (direction == '>') {
     Servo_SetAngle_Safe(45, 0);
     Motor_forward_simple(pwm, pwm);
@@ -1955,7 +2002,13 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
     HAL_Delay(second);
     Servo_SetAngle_Safe(45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(third);
+    HAL_Delay(third * 0.20);
+
+    // If wall is too close, already -> early out
+    if (task_two_second_obs_check()) {
+      Motor_forward_simple(pwm, pwm);
+      HAL_Delay(third * 0.80);
+    }
     Servo_SetAngle_Safe(0, 0);
   }
   Motor_reverse_simple(1000, 1000);

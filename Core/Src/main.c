@@ -23,10 +23,10 @@ UART_HandleTypeDef huart3;
 #define SNAP_WAIT_MS 8000 // 8 seconds to retry once
 
 // TASK 2 - LEG 1
-const float TASK2_obs_1_clearance_distance = 40.0f;
+const float TASK2_obs_1_clearance_distance = 42.5f;
 // CALIBRATE THIS
 const float TASK2_distance_from_back_of_first_obs = 30.0f;
-const float TASK2_obs_2_clearance_distance = 20.0f;
+const float TASK2_obs_2_clearance_distance = 25.0f;
 
 // TASK 2 - RETURN TO START
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
@@ -37,12 +37,12 @@ typedef enum {
   TASK2_SURFACE_OUTSIDE,
   TASK2_SURFACE_ELSON_ROOM,
 } TASK2_Surface_t;
-TASK2_Surface_t TASK2_current_surface = TASK2_SURFACE_ELSON_ROOM;
+TASK2_Surface_t TASK2_current_surface = TASK2_SURFACE_HPL;
 
 // Safe threshold for vertical distance travelled before arcing , measured dist
 // is 400 400 - 120 = 280 400 - 150 = 250
-//
-const float TASK2_vertical_dist_return_arc_buffer = 160.0f;
+// 160 for HPL
+const float TASK2_vertical_dist_return_arc_buffer = 180.0f;
 // Final brake
 const float TASK2_carpark_wall_clearance_distance = 15.0f;
 
@@ -1575,27 +1575,24 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
   OLED_Refresh_Gram();
 }
 
-bool task_two_second_obs_check() {
+void task_two_second_obs_check() {
   // find the acceptable distance to the 2nd obstacle
   reset_encoders();
   float front_dist = HCSR04_Read();
   HAL_Delay(100);
 
   // SEND to rpi for 2nd obstacle while moving
-  char direction_obs2 = '<'; // task_two_uart()
+  // task_two_uart()
 
   // Back up / move forward until 2nd obstacle is within clearance distance
   if (front_dist < TASK2_obs_2_clearance_distance) {
     Drive_Reverse_ToCM_Set_Delay(TASK2_obs_2_clearance_distance - front_dist,
                                  TASK2_PWM, 100);
     TASK2_vertical_dist_now -= cm_travelled_reverse();
-    return false;
   } else if (front_dist >= TASK2_obs_2_clearance_distance) {
     Drive_Forward_Until_Obstacle(TASK2_PWM, TASK2_obs_2_clearance_distance);
     TASK2_vertical_dist_now += cm_travelled_forward();
-    return true;
   }
-  return true;
 }
 
 void task_two() {
@@ -1613,6 +1610,7 @@ void task_two() {
   task_two_clear_first_obs(TASK2_PWM, TASK2_obs_1_clearance_distance,
                            direction_obs1);
 
+  char direction_obs2 = '<';
   task_two_second_obs_check();
 
   // turn according to picture (arrow)
@@ -1689,12 +1687,24 @@ void task_two_return_to_start(char current_direction) {
       TASK2_obs_2_clearance_distance + TASK2_distance_from_back_of_second_obs;
   task_two_print_stats();
 
+  int turn_angle;
+  switch(TASK2_current_surface) {
+	  case TASK2_SURFACE_HPL:
+		  turn_angle = 75;
+		  break;
+	  case TASK2_SURFACE_ELSON_ROOM:
+		  turn_angle = 50;
+	  default:
+		  turn_angle = 75;
+		  break;
+  }
+
   // Wall is on the right, turn right
   if (current_direction == '>') {
-    Turn_Car(75, TASK2_PWM, 45, 0);
-    // Wall is on the left, turn left
+    Turn_Car(turn_angle, TASK2_PWM, 45, 0);
+  // Wall is on the left, turn left
   } else if (current_direction == '<') {
-    Turn_Car(75, TASK2_PWM, -45, 0);
+    Turn_Car(turn_angle, TASK2_PWM, -45, 0);
   }
 
   // Move straight until clear
@@ -1707,10 +1717,11 @@ void task_two_return_to_start(char current_direction) {
                                TASK2_RETURN_PWM, 100);
 
   // Perpencidular to carpark
+
   if (current_direction == '>') {
-    Turn_Car(75, TASK2_PWM, 45, 0);
+    Turn_Car(turn_angle, TASK2_PWM, 45, 0);
   } else if (current_direction == '<') {
-    Turn_Car(75, TASK2_PWM, -45, 0);
+    Turn_Car(turn_angle, TASK2_PWM, -45, 0);
   }
 
   // Use IR to find carpark wall
@@ -1740,9 +1751,9 @@ void task_two_return_to_start(char current_direction) {
   Motor_stop();
 
   if (current_direction == '>') {
-    Turn_Car(75, TASK2_PWM, -45, 0);
+    Turn_Car(turn_angle, TASK2_PWM, -45, 0);
   } else if (current_direction == '<') {
-    Turn_Car(75, TASK2_PWM, 45, 0);
+    Turn_Car(turn_angle, TASK2_PWM, 45, 0);
   }
 
   // Return straight
@@ -1936,7 +1947,7 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
       break;
     case TASK2_SURFACE_ELSON_ROOM:
       first = 750;
-      second = 1300;
+      second = 1400;
       third = 950;
       break;
     default:
@@ -1981,16 +1992,11 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
     HAL_Delay(first);
     Servo_SetAngle_Safe(45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(second * 0.5);
+    HAL_Delay(second);
 
     Servo_SetAngle_Safe(-45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(third * 0.20);
-    // If wall is too close, already -> early out
-    if (task_two_second_obs_check()) {
-      Motor_forward_simple(pwm, pwm);
-      HAL_Delay(third * 0.80);
-    }
+    HAL_Delay(third);
     Servo_SetAngle_Safe(0, 0);
 
   } else if (direction == '>') {
@@ -2002,13 +2008,7 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
     HAL_Delay(second);
     Servo_SetAngle_Safe(45, 0);
     Motor_forward_simple(pwm, pwm);
-    HAL_Delay(third * 0.20);
-
-    // If wall is too close, already -> early out
-    if (task_two_second_obs_check()) {
-      Motor_forward_simple(pwm, pwm);
-      HAL_Delay(third * 0.80);
-    }
+    HAL_Delay(third);
     Servo_SetAngle_Safe(0, 0);
   }
   Motor_reverse_simple(1000, 1000);

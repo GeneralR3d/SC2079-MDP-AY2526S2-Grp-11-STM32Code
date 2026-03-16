@@ -1658,8 +1658,8 @@ void task_two() {
     } while (get_IR_distance_left() < 50.0f);
   }
   Motor_stop();
-  task_two_return_to_start(direction_obs2 == '<' ? '>' : '<');
-
+  //task_two_return_to_start(direction_obs2 == '<' ? '>' : '<');
+  task_two_return_to_start_alternate(direction_obs2 == '<' ? '>' : '<');
   Motor_stop();
   // Inform RPI end of task 2
   send_message_over("END\n");
@@ -1760,7 +1760,7 @@ void Turn_Right90_Straight_Left90_Fast(int pwm, uint32_t turn_ms, uint32_t strai
   HAL_Delay(straight_ms);       // how far you want to go
   // Left 90
   Servo_SetAngle_Safe(-45, 0);
-  HAL_Delay(50);
+  HAL_Delay(475);
   Motor_forward_simple(pwm, pwm);
   HAL_Delay(turn_ms);
   Motor_stop();
@@ -1780,7 +1780,7 @@ void Turn_Left90_Straight_Right90_Fast(int pwm, uint32_t turn_ms, uint32_t strai
   HAL_Delay(straight_ms);       // how far you want to go
   // Left 90
   Servo_SetAngle_Safe(45, 0);
-  HAL_Delay(50);
+  HAL_Delay(475);
   Motor_forward_simple(pwm, pwm);
   HAL_Delay(turn_ms);
   Motor_stop();
@@ -1813,7 +1813,7 @@ void task_two_return_to_start_alternate(char current_direction) {
   int first, second, third;
 
   if (current_direction == '>') {
-    Turn_Right90_Straight_Left90_Fast(TASK2_RETURN_PWM, 600, 1250);
+    Turn_Right90_Straight_Left90_Fast(TASK2_RETURN_PWM, 300, 200);
     // first = 600;
     // second = 1250;
     // third = 950;
@@ -1831,7 +1831,7 @@ void task_two_return_to_start_alternate(char current_direction) {
 
   } else if (current_direction == '<') {
 
-    Turn_Left90_Straight_Right90_Fast(TASK2_RETURN_PWM, 500, 1350);
+    Turn_Left90_Straight_Right90_Fast(TASK2_RETURN_PWM, 500, 300);
     // first = 500;
     // second = 1350;
     // third = 750;
@@ -1918,7 +1918,7 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
   int first, second, third;
   if (direction == '<') {
     /****left */
-    first = 675;
+    first = 750;
     second = 1200;
     third = 950;
 

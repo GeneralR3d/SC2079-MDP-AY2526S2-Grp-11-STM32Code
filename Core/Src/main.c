@@ -1918,10 +1918,13 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
   int first, second, third;
   if (direction == '<') {
     /****left */
-    first = 600;
-    //  second = 1150;
-    second = 1250;
+    first = 675;
+    second = 1200;
     third = 950;
+
+    // first = 600;
+    // second = 1250;
+    // third = 950;
   } else if (direction == '>') {
     /****right */
     first = 500;

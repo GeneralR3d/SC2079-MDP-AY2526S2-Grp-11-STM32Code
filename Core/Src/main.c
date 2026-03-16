@@ -19,7 +19,7 @@ UART_HandleTypeDef huart3;
 
 // VARIABLES FOR TASK 2
 #define TASK2_PWM 3000
-#define TASK2_RETURN_PWM 4500
+#define TASK2_RETURN_PWM 5000
 #define SNAP_WAIT_MS 8000 // 8 seconds to retry once
 
 // TASK 2 - LEG 1
@@ -30,12 +30,15 @@ const float TASK2_obs_2_clearance_distance = 20.0f;
 
 // TASK 2 - RETURN TO START
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
-const float TASK2_carpark_side_IR_distance_threshold = 50.0f;
+const float TASK2_carpark_side_IR_distance_threshold = 25.0f;
 
-// Safe threshold for vertical distance travelled before arcing
-const float TASK2_vertical_dist_return_arc_buffer = 120.0f; 
+// Safe threshold for vertical distance travelled before arcing , measured dist is 400
+// 400 - 120 = 280
+// 400 - 150 = 250
+//
+const float TASK2_vertical_dist_return_arc_buffer = 160.0f;
 // Final brake
-const float TASK2_carpark_wall_clearance_distance = 40.0f;
+const float TASK2_carpark_wall_clearance_distance = 15.0f;
 
 
 volatile float TASK2_vertical_dist_now = 0;
@@ -359,9 +362,18 @@ void Motor_forward(int pwmVal) {
     correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-  int left_offset = -350;
+  int left_offset = -324;
   // int right_offset = -300;
   int right_offset = 0;
+
+  /* -350, 0 -> significant left drift
+   * -325, 0 -> very slight right drift
+   * -337, 0 -> slight left
+   * -332, 0 -> a lot left
+   * -327
+   * -325
+   * -320 too much right
+   */
 
   // --- Apply correction + offsets ---
   int left_pwm = pwmVal + left_offset + correction;
@@ -1515,6 +1527,7 @@ void task_two() {
     Turn_Car(90, TASK2_PWM, -45, 0);
     reset_encoders();
     Motor_forward_reset_heading();
+
     // use right IR
     do {
       Motor_forward(TASK2_PWM);
@@ -1525,9 +1538,13 @@ void task_two() {
 
     TASK2_horizontal_dist_now += cm_travelled_forward();
     Turn_Car(180, TASK2_PWM, 45, 0);
+    //   Turn_Car(180, TASK2_PWM, 45, 0);
     Motor_forward_reset_heading();
 
     reset_encoders();
+
+    Motor_forward(TASK2_PWM);
+     HAL_Delay(750);
     // use right IR
     do {
       Motor_forward(TASK2_PWM);
@@ -1561,6 +1578,9 @@ void task_two() {
     TASK2_horizontal_dist_now += cm_travelled_forward();
     Turn_Car(180, TASK2_PWM, -45, 0);
     Motor_forward_reset_heading();
+
+    Motor_forward(TASK2_PWM);
+    HAL_Delay(750);
     // use left IR
     do {
       Motor_forward(TASK2_PWM);
@@ -1578,7 +1598,7 @@ void task_two() {
     // Turn_Car(90, TASK2_PWM, 45, 0);
   }
   Motor_stop();
-  task_two_return_to_start(previous_direction == '<' ? '>' : '<');
+  task_two_return_to_start(direction == '<' ? '>' : '<');
 
 
 
@@ -1604,23 +1624,24 @@ void task_two_return_to_start(char current_direction) {
   
   // Wall is on the right, turn right
   if (current_direction == '>') {
-    Turn_Car(90, TASK2_PWM, 45, 0);
+    Turn_Car(75, TASK2_PWM, 45, 0);
   // Wall is on the left, turn left
   } else if (current_direction == '<') {
-    Turn_Car(90, TASK2_PWM, -45, 0);
+    Turn_Car(75, TASK2_PWM, -45, 0);
   }
 
   // Move straight until clear
   reset_encoders();
+  Motor_forward_reset_heading();
 
   // Drive forward until arc point
   Drive_Forward_ToCM(TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer, TASK2_RETURN_PWM);
 
   // Perpencidular to carpark
   if(current_direction == '>') {
-    Turn_Car(90, TASK2_PWM, 45, 0);
+    Turn_Car(75, TASK2_PWM, 45, 0);
   } else if(current_direction == '<') {
-    Turn_Car(90, TASK2_PWM, -45, 0);
+    Turn_Car(75, TASK2_PWM, -45, 0);
   }
 
 
@@ -1642,9 +1663,9 @@ void task_two_return_to_start(char current_direction) {
   Motor_stop();
 
   if(current_direction == '>') {
-    Turn_Car(90, TASK2_PWM, -45, 0);
+    Turn_Car(75, TASK2_PWM, -45, 0);
   } else if(current_direction == '<') {
-    Turn_Car(90, TASK2_PWM, 45, 0);
+    Turn_Car(75, TASK2_PWM, 45, 0);
   }
 
   // Return straight
@@ -1715,7 +1736,8 @@ void task_two_clear_first_obs(int pwm, float obstacle_clearance_distance,
   if (direction == '<') {
     /****left */
     first = 600;
-    second = 1150;
+  //  second = 1150;
+    second = 1250;
     third = 950;
   } else if (direction == '>') {
     /****right */

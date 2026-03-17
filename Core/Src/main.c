@@ -37,7 +37,7 @@ typedef enum {
   TASK2_SURFACE_OUTSIDE,
   TASK2_SURFACE_ELSON_ROOM,
 } TASK2_Surface_t;
-TASK2_Surface_t TASK2_current_surface = TASK2_SURFACE_OUTSIDE;
+TASK2_Surface_t TASK2_current_surface = TASK2_SURFACE_HPL;
 
 // Safe threshold for vertical distance travelled before arcing , measured dist
 // is 400 400 - 120 = 280 400 - 150 = 250
@@ -164,6 +164,7 @@ void Motor_stop(void);
 void Drive_Forward_ToCM(float target_cm, int base_pwm); // function prototype
 void Drive_Reverse_ToCM(float target_cm, int base_pwm);
 void task_two_clear_first_obs(int pwm, float first_obs_dist, char direction);
+void task_two_clear_first_obs_alternate(int pwm, float first_obs_dist, char direction);
 void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance);
 void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
@@ -1611,7 +1612,7 @@ void task_two() {
   TASK2_horizontal_dist_now = 0;
 
   // listen to rpi for 1st obstacle
-  char direction_obs1 = '<'; // task_two_uart()
+  char direction_obs1 = '>'; // task_two_uart()
 
   // drive around 1st obstacle
   task_two_clear_first_obs_alternate(TASK2_PWM, TASK2_obs_1_clearance_distance,
@@ -2003,11 +2004,60 @@ void task_two_clear_first_obs_alternate(int pwm, float obstacle_clearance_distan
 		Turn_Car(-45, pwm, -45, 0);
 		Turn_Car(35, pwm, 45, 0);
 
+		do {
+
+			Motor_forward_simple(pwm, pwm);
+			HAL_Delay(30);
+
+		} while (get_IR_distance_right() > 25.0);
+
+		do {
+
+			Motor_forward_simple(pwm, pwm);
+			HAL_Delay(30);
+
+
+		} while (get_IR_distance_right() < 25.0);
+
+		Motor_stop();
+
+		Turn_Car(75, pwm, 45, 0);
+		Motor_reverse_simple(pwm, pwm);
+		HAL_Delay(250);
+		Turn_Car(60, pwm, -45, 0);
 		Motor_forward_simple(pwm, pwm);
-		HAL_Delay(500);
+		HAL_Delay(100);
+		Motor_stop();
 
 	} else if (direction == '>') {
 
+		Turn_Car(-45, pwm, 45, 0);
+		Turn_Car(35, pwm, -45, 0);
+
+		do {
+
+			Motor_forward_simple(pwm, pwm);
+			HAL_Delay(30);
+
+		} while (get_IR_distance_left() > 25.0);
+
+		do {
+
+			Motor_forward_simple(pwm, pwm);
+			HAL_Delay(30);
+
+
+		} while (get_IR_distance_left() < 25.0);
+
+		Motor_stop();
+
+		Turn_Car(75, pwm, -45, 0);
+		Motor_reverse_simple(pwm, pwm);
+		HAL_Delay(150);
+		Turn_Car(60, pwm, 45, 0);
+		Motor_forward_simple(pwm, pwm);
+		HAL_Delay(100);
+		Motor_stop();
 	}
 	Motor_reverse_simple(1000, 1000);
 	HAL_Delay(50);

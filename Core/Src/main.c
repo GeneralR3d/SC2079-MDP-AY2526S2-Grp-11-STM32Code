@@ -24,29 +24,30 @@ UART_HandleTypeDef huart3;
 
 // TASK 2 - LEG 1
 const float TASK2_obs_1_clearance_distance = 42.5f;
-// CALIBRATE THIS
 const float TASK2_distance_from_back_of_first_obs = 30.0f;
+
 const float TASK2_obs_2_clearance_distance = 25.0f;
 
 // TASK 2 - RETURN TO START
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
 
-// 40 outside
+// Safe threshold for vertical distance travelled before arcing  
+const float TASK2_vertical_dist_return_arc_buffer = 50.0f;
+
+// Threshold for skipping reverse motion and makes final turn immediately
+const float TASK2_obstacle2_too_short_threshold = 40.0f;
+
+// Threshold for checking if carpark side is clear
 const float TASK2_carpark_side_IR_distance_threshold = 40.0f;
+
+// Final brake ultrasonic distance threshold
+const float TASK2_carpark_wall_clearance_distance = 17.5f;
 
 typedef enum {
   TASK2_SURFACE_HPL,
   TASK2_SURFACE_OUTSIDE,
-  TASK2_SURFACE_ELSON_ROOM,
 } TASK2_Surface_t;
 TASK2_Surface_t TASK2_current_surface = TASK2_SURFACE_HPL;
-
-// Safe threshold for vertical distance travelled before arcing , measured dist
-// is 400 400 - 120 = 280 400 - 150 = 250
-// 160 for HPL
-const float TASK2_vertical_dist_return_arc_buffer = 180.0f;
-// Final brake
-const float TASK2_carpark_wall_clearance_distance = 17.5f;
 
 volatile float TASK2_vertical_dist_now = 0;
 volatile float TASK2_horizontal_dist_now = 0;
@@ -1717,26 +1718,38 @@ void task_two_print_stats() {
   HAL_Delay(1000);
 }
 
-void task_two_return_to_start(char direction_obs1, char current_direction) {
+// This is the entry point for returning to the start
+// IR sensor detects that second obstacle is cleared
+void task_two_return_to_start(char direction_obs1, char initial_carpark_direction) {
 
   TASK2_vertical_dist_now +=
       TASK2_obs_2_clearance_distance + TASK2_distance_from_back_of_second_obs;
   task_two_print_stats();
 
+  // Drive forward slightly to get away from the carpark wall
   Motor_forward_simple(TASK2_PWM, TASK2_PWM);
+
+  // Do not increase this further - needs 50 cm clearance
   HAL_Delay(125);
   Motor_stop();
 
+
+  // Calculate turn angle to face carpark general direction, based on current surface 
   int turn_angle;
+
   switch(TASK2_current_surface) {
 	  case TASK2_SURFACE_HPL:
-		  if(current_direction=='>')
+      {
+		  if(initial_carpark_direction=='>')
 			  turn_angle = 90;
 		  else
 			  turn_angle = 85;
+      }
 		  break;
+
+    // OUTDATED
 	  case TASK2_SURFACE_OUTSIDE:
-		  if(current_direction=='>')
+		  if(initial_carpark_direction=='>')
 			  turn_angle = 85;
 		  else
 			  if(direction_obs1 == '>')
@@ -1744,80 +1757,92 @@ void task_two_return_to_start(char direction_obs1, char current_direction) {
 			  else
 				  turn_angle = 78;
 		  break;
-	  case TASK2_SURFACE_ELSON_ROOM:
-		  turn_angle = 50;
 	  default:
 		  turn_angle = 75;
 		  break;
   }
 
-  // Wall is on the right, turn right
-  if (current_direction == '>') {
+  // Carpark is on the right, turn right
+  if (initial_carpark_direction == '>') {
     Turn_Car(turn_angle, TASK2_PWM, 45, 0);
-  // Wall is on the left, turn left
-  } else if (current_direction == '<') {
+  // Carpark is on the left, turn left
+  } else if (initial_carpark_direction == '<') {
     Turn_Car(turn_angle + 7, TASK2_PWM, -45, 0);
-  }
-
 
   // Move straight until clear
   reset_encoders();
   Motor_forward_reset_heading();
   HAL_Delay(500);
 
-  int sec_dist = TASK2_vertical_dist_now - 50.0f;
-
-//  if(current_direction == '<') {
-//	  sec_dist += 15;
-//  }
-
-
+  // The car is now facing back at the carpark wall
+  int return_dist = TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
 
   // Drive forward until arc point
-  Drive_Forward_ToCM_Set_Delay(sec_dist,
+  Drive_Forward_ToCM_Set_Delay(return_dist,
                                TASK2_RETURN_PWM, 100);
 
-  // Perpencidular to carpark
-
-  if (current_direction == '>') {
-    Turn_Car(turn_angle + 5, 3000, 45, 0);
-  } else if (current_direction == '<') {
-    Turn_Car(turn_angle, 3000, -45, 0);
+  // Turn in perpencidular to carpark
+  if (initial_carpark_direction == '>') {
+    Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0);
+  } else if (initial_carpark_direction == '<') {
+    Turn_Car(turn_angle, TASK2_PWM, -45, 0);
   }
 
-  // Use IR to find carpark wall
-  // Should be on the opposite side of the arc direction (arc right , wall on
-  // the left)
+  // Based on length of obstacle2, first reverse then move forward until the carpark wall is found
+  // If obstacle2 is too short, it will skip this step and assume that carpark wall is already clear
+  if(TASK2_horizontal_dist_now > TASK2_obstacle2_too_short_threshold) {
 
-  if(TASK2_horizontal_dist_now > 40.0f) {
+    const float alignment_pwm = 2500;s
 
-	  Motor_reverse_simple(2500, 2500);
+	  Motor_reverse_simple(alignment_pwm, alignment_pwm);
 	  HAL_Delay(1000);
 	  Motor_stop();
 
-
+    // Move forward until the carpark wall is found
 	  do {
-	    Motor_forward_simple(2500, 2500);
+	    Motor_forward_simple(alignment_pwm, alignment_pwm);
 	    HAL_Delay(30); // polling rate for IR sensor
 	  } while (
-	      (current_direction == '>' &&
+	      (initial_carpark_direction == '>' &&
 	       get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) ||
-	      (current_direction == '<' &&
+	      (initial_carpark_direction == '<' &&
 	       get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
 	  Motor_stop();
 
+    // Move forward boost to clear carpark wall
 	  Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-	  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
-		  HAL_Delay(180);
-	  }else{
-		  if(current_direction == '>')
-			  HAL_Delay(275);
-		  else
-			  HAL_Delay(325);
-	  }
+    switch(TASK2_current_surface) {
+      case TASK2_SURFACE_HPL:
+        {
+          if(initial_carpark_direction == '>')
+            HAL_Delay(275);
+          else
+            HAL_Delay(325);
+        }
+        break;
+      case TASK2_SURFACE_OUTSIDE:
+        HAL_Delay(275);
+        break;
+    }
 	  Motor_stop();
-
   }
+
+
+  // Turn into carpark bay in the final stretch
+  if (initial_carpark_direction == '>') {
+    // Left turn
+    Turn_Car(turn_angle - 10, TASK2_PWM, -45, 0);
+  } else if (initial_carpark_direction == '<') {
+    // Right turn
+    Turn_Car(turn_angle, TASK2_PWM, 45, 0);
+  }
+
+  // Return straight to start position, stopping based on ultrasonic 
+  reset_encoders();
+  Motor_forward_reset_heading();
+  Drive_Forward_Until_Obstacle(TASK2_RETURN_PWM,
+                               TASK2_carpark_wall_clearance_distance);
+  Motor_stop();
 
   //Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
 //  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
@@ -1850,20 +1875,6 @@ void task_two_return_to_start(char direction_obs1, char current_direction) {
 //  Motor_stop();
 
   // Go forward again until carpark wall is gone
-
-
-  if (current_direction == '>') {
-    Turn_Car(turn_angle - 10, TASK2_PWM, -45, 0);
-  } else if (current_direction == '<') {
-    Turn_Car(turn_angle, TASK2_PWM, 45, 0);
-  }
-
-  // Return straight
-  reset_encoders();
-  Motor_forward_reset_heading();
-  Drive_Forward_Until_Obstacle(TASK2_RETURN_PWM,
-                               TASK2_carpark_wall_clearance_distance);
-  Motor_stop();
 }
 
 void Turn_Right90_Straight_Left90_Fast(int pwm, uint32_t turn_ms,

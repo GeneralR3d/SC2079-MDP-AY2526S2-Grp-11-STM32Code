@@ -30,6 +30,8 @@ const float TASK2_obs_2_clearance_distance = 25.0f;
 
 // TASK 2 - RETURN TO START
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
+
+// 40 outside
 const float TASK2_carpark_side_IR_distance_threshold = 40.0f;
 
 typedef enum {
@@ -1612,7 +1614,7 @@ void task_two() {
   TASK2_horizontal_dist_now = 0;
 
   // listen to rpi for 1st obstacle
-  char direction_obs1 = '>'; // task_two_uart()
+  char direction_obs1 = '<'; // task_two_uart()
 
   // drive around 1st obstacle
   task_two_clear_first_obs_alternate(TASK2_PWM, TASK2_obs_1_clearance_distance,
@@ -1621,9 +1623,9 @@ void task_two() {
 
   char direction_obs2 = '<';
   task_two_second_obs_check();
-
-  Motor_stop();
-  return;
+//
+//  Motor_stop();
+//  return;
 
 
 
@@ -1639,7 +1641,7 @@ void task_two() {
       HAL_Delay(30);
     } while (get_IR_distance_right() < 50.0f);
 
-    TASK2_horizontal_dist_now += cm_travelled_forward();
+   // TASK2_horizontal_dist_now += cm_travelled_forward();
    // Turn_Car(180, TASK2_PWM, 45, 0);
     if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE)
     	if(direction_obs1 == '>')
@@ -1657,11 +1659,15 @@ void task_two() {
     // Failsafe to prevent undershooting wall when turning 180
     Motor_forward(TASK2_PWM);
     HAL_Delay(750);
+
+
     // use right IR
     do {
       Motor_forward(TASK2_PWM);
       HAL_Delay(30);
-    } while (get_IR_distance_right() < 50.0f);
+    } while (get_IR_distance_right() < 60.0f);
+
+
 
   } else if (direction_obs2 == '>') {
     Turn_Car(90, TASK2_PWM, 45, 0);
@@ -1673,7 +1679,7 @@ void task_two() {
       HAL_Delay(30);
     } while (get_IR_distance_left() < 50.0f);
 
-    TASK2_horizontal_dist_now += cm_travelled_forward();
+    //TASK2_horizontal_dist_now += cm_travelled_forward();
 
     if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE)
 
@@ -1690,8 +1696,9 @@ void task_two() {
     do {
       Motor_forward(TASK2_PWM);
       HAL_Delay(30);
-    } while (get_IR_distance_left() < 50.0f);
+    } while (get_IR_distance_left() < 60.0f);
   }
+  TASK2_horizontal_dist_now = cm_travelled_forward();
   Motor_stop();
   task_two_return_to_start(direction_obs1, direction_obs2 == '<' ? '>' : '<');
   //task_two_return_to_start_alternate(direction_obs2 == '<' ? '>' : '<');
@@ -1702,9 +1709,9 @@ void task_two() {
 
 void task_two_print_stats() {
   char buf[100];
-  snprintf(buf, sizeof(buf), "V:%.1f", TASK2_vertical_dist_now);
-  // snprintf(buf, sizeof(buf), "V:%.1f H:%.1f", TASK2_vertical_dist_now,
-  // TASK2_horizontal_dist_now);
+//snprintf(buf, sizeof(buf), "V:%.1f", TASK2_vertical_dist_now);
+   snprintf(buf, sizeof(buf), "V:%.1f H:%.1f", TASK2_vertical_dist_now,
+   TASK2_horizontal_dist_now);
   OLED_ShowString(0, 30, (uint8_t *)buf);
   OLED_Refresh_Gram();
   HAL_Delay(1000);
@@ -1723,7 +1730,10 @@ void task_two_return_to_start(char direction_obs1, char current_direction) {
   int turn_angle;
   switch(TASK2_current_surface) {
 	  case TASK2_SURFACE_HPL:
-		  turn_angle = 72;
+		  if(current_direction=='>')
+			  turn_angle = 90;
+		  else
+			  turn_angle = 85;
 		  break;
 	  case TASK2_SURFACE_OUTSIDE:
 		  if(current_direction=='>')
@@ -1749,19 +1759,19 @@ void task_two_return_to_start(char direction_obs1, char current_direction) {
     Turn_Car(turn_angle + 7, TASK2_PWM, -45, 0);
   }
 
+
   // Move straight until clear
   reset_encoders();
   Motor_forward_reset_heading();
+  HAL_Delay(500);
 
-  int sec_dist = TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
+  int sec_dist = TASK2_vertical_dist_now - 50.0f;
 
-  if(current_direction == '<') {
-	  sec_dist += 15;
-  }
-
-//  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
-//	  sec_dist -= 10;
+//  if(current_direction == '<') {
+//	  sec_dist += 15;
 //  }
+
+
 
   // Drive forward until arc point
   Drive_Forward_ToCM_Set_Delay(sec_dist,
@@ -1770,7 +1780,7 @@ void task_two_return_to_start(char direction_obs1, char current_direction) {
   // Perpencidular to carpark
 
   if (current_direction == '>') {
-    Turn_Car(turn_angle, 3000, 45, 0);
+    Turn_Car(turn_angle + 5, 3000, 45, 0);
   } else if (current_direction == '<') {
     Turn_Car(turn_angle, 3000, -45, 0);
   }
@@ -1779,46 +1789,71 @@ void task_two_return_to_start(char direction_obs1, char current_direction) {
   // Should be on the opposite side of the arc direction (arc right , wall on
   // the left)
 
-  // Monitor
-  Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
- // HAL_Delay(200);
-  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
-	  HAL_Delay(100);
-  }else{
-	  HAL_Delay(200);
+  if(TASK2_horizontal_dist_now > 40.0f) {
+
+	  Motor_reverse_simple(2500, 2500);
+	  HAL_Delay(1000);
+	  Motor_stop();
+
+
+	  do {
+	    Motor_forward_simple(2500, 2500);
+	    HAL_Delay(30); // polling rate for IR sensor
+	  } while (
+	      (current_direction == '>' &&
+	       get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) ||
+	      (current_direction == '<' &&
+	       get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
+	  Motor_stop();
+
+	  Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+	  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
+		  HAL_Delay(180);
+	  }else{
+		  if(current_direction == '>')
+			  HAL_Delay(275);
+		  else
+			  HAL_Delay(325);
+	  }
+	  Motor_stop();
+
   }
+
+  //Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+//  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
+//	  HAL_Delay(100);
+//  }else{
+//	  HAL_Delay(150);
+//  }
+
+  // Only accelerate if front right/left sensor doesn't see obstacle 1
+//  if((current_direction=='>' && get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold)
+//		  || (current_direction == '<' && get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold)) {
+//	  // Monitor
+//	  Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+//	  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
+//		  HAL_Delay(100);
+//	  }else{
+//		  HAL_Delay(150);
+//	  }
+//  }
+
   // Reverse until carpark wall is found
-  do {
-    Motor_reverse_simple(2500, 2500);
-    HAL_Delay(30); // polling rate for IR sensor
-  } while (
-      (current_direction == '>' &&
-       get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) ||
-      (current_direction == '<' &&
-       get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
-  Motor_stop();
+//  do {
+//    Motor_reverse_simple(2500, 2500);
+//    HAL_Delay(30); // polling rate for IR sensor
+//  } while (
+//      (current_direction == '>' &&
+//       get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) ||
+//      (current_direction == '<' &&
+//       get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
+//  Motor_stop();
 
   // Go forward again until carpark wall is gone
-  do {
-    Motor_forward_simple(2500, 2500);
-    HAL_Delay(30); // polling rate for IR sensor
-  } while (
-      (current_direction == '>' &&
-       get_IR_distance_left() < TASK2_carpark_side_IR_distance_threshold) ||
-      (current_direction == '<' &&
-       get_IR_distance_right() < TASK2_carpark_side_IR_distance_threshold));
-  Motor_stop();
 
-  Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
-  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
-	  HAL_Delay(180);
-  }else{
-	  HAL_Delay(225);
-  }
-  Motor_stop();
 
   if (current_direction == '>') {
-    Turn_Car(turn_angle, TASK2_PWM, -45, 0);
+    Turn_Car(turn_angle - 10, TASK2_PWM, -45, 0);
   } else if (current_direction == '<') {
     Turn_Car(turn_angle, TASK2_PWM, 45, 0);
   }
@@ -2025,8 +2060,8 @@ void task_two_clear_first_obs_alternate(int pwm, float obstacle_clearance_distan
 		Motor_reverse_simple(pwm, pwm);
 		HAL_Delay(250);
 		Turn_Car(60, pwm, -45, 0);
-		Motor_forward_simple(pwm, pwm);
-		HAL_Delay(100);
+		//Motor_forward_simple(pwm, pwm);
+		//HAL_Delay(100);
 		Motor_stop();
 
 	} else if (direction == '>') {

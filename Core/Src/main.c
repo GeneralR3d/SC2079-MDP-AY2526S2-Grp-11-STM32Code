@@ -1820,7 +1820,7 @@ void task_two_return_to_start(char direction_obs1, char initial_carpark_directio
   // If obstacle2 is too short, it will skip this step and assume that carpark wall is already clear
   if(TASK2_horizontal_dist_now > TASK2_obstacle2_too_short_threshold) {
 
-    const float alignment_pwm = 2500;s
+    const float alignment_pwm = 2500;
 
 	  Motor_reverse_simple(alignment_pwm, alignment_pwm);
 	  HAL_Delay(1000);

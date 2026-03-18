@@ -44,7 +44,7 @@ const float TASK2_obs_2_clearance_distance = 25.0f;
 // TASK 2 - RETURN TO START
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
 // Safe threshold for vertical distance travelled before arcing
-const float TASK2_vertical_dist_return_arc_buffer = 30.0f;
+const float TASK2_vertical_dist_return_arc_buffer = 20.0f;
 // Threshold for skipping reverse motion and makes final turn immediately
 const float TASK2_obstacle2_too_short_threshold = 40.0f;
 // Threshold for checking if carpark side is clear
@@ -100,6 +100,7 @@ float GYRO_RIGHT_BIAS = 130.959f;
 float yaw_angle = 0; // global or static variable
 uint32_t last_time = 0;
 float gyro_gz_filtered = 0.0f; // Global to allow reset between turns
+extern float gyro_z_bias;      // Declaration so functions above line 931 can use it
 
 #define CMD_BUF_LEN 64
 #define PI 3.141592653589f
@@ -332,12 +333,11 @@ void Motor_forward(int pwmVal) {
   static float last_error = 0.0f;
   static float gz_filtered = 0.0f;
 
+  static int correction = 0; // make correction static so we can skip PID updates if elapsed time hasn't changed
+
   // --- Timing ---
   uint32_t now = HAL_GetTick();
-  float dt = (now - last_time) / 1000.0f; // ms -> seconds
-  if (dt <= 0)
-    dt = 0.001f; // protect against div by 0
-  last_time = now;
+  uint32_t elapsed = now - last_time;
 
   if (!initialized || motor_forward_needs_reset) {
     target_heading = heading; // lock current heading as new target
@@ -346,7 +346,23 @@ void Motor_forward(int pwmVal) {
     last_time = HAL_GetTick(); // prevent dt spike after a turn
     initialized = 1;
     motor_forward_needs_reset = 0;
+    elapsed = 0; // Skip first calculation to ensure accurate dt
   }
+
+  // Only calculate PID if time has passed
+  if (elapsed > 0) {
+    float dt = elapsed / 1000.0f; // ms -> seconds
+    last_time = now;
+
+    // --- Read IMU directly to update gz_dps (was always 0!) ---
+    int16_t ax, ay, az, gx, gy, gz;
+    ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+    float gz_raw = (float)gz - gyro_z_bias;
+    if (gz_raw > 0) {
+      gz_dps = gz_raw / GYRO_LEFT_BIAS;
+    } else {
+      gz_dps = gz_raw / GYRO_RIGHT_BIAS;
+    }
 
   // --- Filter gyro Z-axis (yaw rate) ---
   float alpha =
@@ -363,23 +379,29 @@ void Motor_forward(int pwmVal) {
   last_error = heading_error;
 
   // --- PID controller gains ---
-  float Kp_h = 30.0f; // proportional gain
-  float Ki_h = 4.0f;  // integral gain
-  float Kd_h = 3.5f;  // derivative gain
+ float Kp_h = 40.0f; // proportional gain //old
+ float Ki_h = 4.0f;  // integral gain //old
+ float Kd_h = 3.5f;  // derivative gain  old
+
+  // --- PID controller gains ---
+  // float Kp_h = 40.0f; // proportional gain
+  // float Ki_h = 0.0f;  // integral gain
+  // float Kd_h = 0.5f;  // derivative gain
 
   // --- Control law (PID) ---
-  int correction =
-      (int)(Kp_h * heading_error + Ki_h * integral + Kd_h * derivative);
+    correction =
+        (int)(Kp_h * heading_error + Ki_h * integral + Kd_h * derivative);
+  } // end of (elapsed > 0) block
 
-  // --- Clamp correction ---
-  if (correction > 2000)
-    correction = 2000;
-  if (correction < -2000)
-    correction = -2000;
+  // // --- Clamp correction ---
+  // if (correction > 2000)
+  //   correction = 2000;
+  // if (correction < -2000)
+  //   correction = -2000;
 
   // --- Motor offset compensation (baseline bias) ---
-
-  int left_offset = -324;
+  // -324, slight right
+  int left_offset = 0;
 
   if (TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
     left_offset = -350;
@@ -392,15 +414,20 @@ void Motor_forward(int pwmVal) {
   /* -350, 0 -> significant left drift
    * -325, 0 -> very slight right drift
    * -337, 0 -> slight left
+   * -335, 0 -> slight left
    * -332, 0 -> a lot left
+   * -330, 0 -> slight left
    * -327
    * -325
    * -320 too much right
    */
 
   // --- Apply correction + offsets ---
-  int left_pwm = pwmVal + left_offset + correction;
-  int right_pwm = pwmVal + right_offset - correction;
+  // A left drift (heading > 0) yields a negative correction.
+  // To counteract drifting left, we must turn right (left motor faster, right motor slower).
+  // Thus, subtract correction from left and add to right.
+  int left_pwm = pwmVal + left_offset - correction;
+  int right_pwm = pwmVal + right_offset + correction;
 
   // Clamp to valid PWM range
   // if (left_pwm > pwmMax)
@@ -438,17 +465,33 @@ void Motor_reverse(int pwmVal) {
   static float last_error = 0.0f;
   static float gz_filtered = 0.0f;
 
+  static int correction = 0; // make static to remember between skipped loops
+
   // --- Timing ---
   uint32_t now = HAL_GetTick();
-  float dt = (now - last_time) / 1000.0f; // ms -> seconds
-  if (dt <= 0)
-    dt = 0.001f; // protect against div by 0
-  last_time = now;
+  uint32_t elapsed = now - last_time;
 
   if (!initialized) {
     target_heading = heading; // lock current heading
     initialized = 1;
+    last_time = HAL_GetTick();
+    elapsed = 0;
   }
+
+  // Only calculate PID if time has passed
+  if (elapsed > 0) {
+    float dt = elapsed / 1000.0f; // ms -> seconds
+    last_time = now;
+
+    // --- Read IMU directly to update gz_dps (was always 0!) ---
+    int16_t ax, ay, az, gx, gy, gz;
+    ICM20948_ReadRaw(&ax, &ay, &az, &gx, &gy, &gz);
+    float gz_raw = (float)gz - gyro_z_bias;
+    if (gz_raw > 0) {
+      gz_dps = gz_raw / GYRO_LEFT_BIAS;
+    } else {
+      gz_dps = gz_raw / GYRO_RIGHT_BIAS;
+    }
 
   // --- Filter gyro Z-axis (yaw rate) ---
   float alpha =
@@ -470,8 +513,9 @@ void Motor_reverse(int pwmVal) {
   float Kd_h = 3.5f;  // derivative gain
 
   // --- Control law (PID) ---
-  int correction =
-      (int)(Kp_h * heading_error + Ki_h * integral + Kd_h * derivative);
+    correction =
+        (int)(Kp_h * heading_error + Ki_h * integral + Kd_h * derivative);
+  } // end of (elapsed > 0) block
 
   // --- Clamp correction ---
   if (correction > 2000)
@@ -484,8 +528,10 @@ void Motor_reverse(int pwmVal) {
   int right_offset = -75;
 
   // --- Apply correction + offsets ---
-  int left_pwm = pwmVal + left_offset - correction;
-  int right_pwm = pwmVal + right_offset + correction;
+  // In reverse mode, logic signs also need to be analyzed based on wiring.
+  // We'll flip signs back to negative feedback if they matched the original forward bug.
+  int left_pwm = pwmVal + left_offset + correction;
+  int right_pwm = pwmVal + right_offset - correction;
 
   // Clamp to valid PWM range
   if (left_pwm > pwmMax)
@@ -1744,7 +1790,7 @@ void task_two_return_to_start(char direction_obs1,
   switch (TASK2_current_surface) {
   case TASK2_SURFACE_HPL: {
     if (initial_carpark_direction == '>')
-      turn_angle = 90;
+      turn_angle = 75;
     else
       turn_angle = 85;
   } break;
@@ -2030,6 +2076,7 @@ void testing() {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
+
 }
 
 /* USER CODE END 0 */

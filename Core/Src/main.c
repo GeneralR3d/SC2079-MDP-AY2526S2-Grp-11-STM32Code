@@ -35,7 +35,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 // TASK 2 - OBS1
 const float TASK2_obs_1_clearance_distance = 42.5f;
-const float TASK2_obs_1_start_side_distance = 25.0f;
+const float TASK2_obs_1_start_side_distance = 45.0f;
 
 // TASK 2 - OBS2
 const float TASK2_distance_from_back_of_first_obs = 30.0f;
@@ -2011,7 +2011,7 @@ void task_two_clear_first_obs_alternate(int pwm,
                              obstacle_clearance_distance + 10 +
                              TASK2_distance_from_back_of_first_obs;
 }
-}
+
 
 void front_back_test() {
   int delay_btw_front_back = 5000;

@@ -38,13 +38,13 @@ const float TASK2_obs_1_clearance_distance = 42.5f;
 const float TASK2_obs_1_start_side_distance = 45.0f;
 
 // TASK 2 - OBS2
-const float TASK2_distance_from_back_of_first_obs = 30.0f;
+const float TASK2_distance_from_back_of_first_obs = 60.0f;
 const float TASK2_obs_2_clearance_distance = 25.0f;
 
 // TASK 2 - RETURN TO START
 const float TASK2_distance_from_back_of_second_obs = 10.0f;
 // Safe threshold for vertical distance travelled before arcing
-const float TASK2_vertical_dist_return_arc_buffer = 50.0f;
+const float TASK2_vertical_dist_return_arc_buffer = 30.0f;
 // Threshold for skipping reverse motion and makes final turn immediately
 const float TASK2_obstacle2_too_short_threshold = 40.0f;
 // Threshold for checking if carpark side is clear
@@ -1119,7 +1119,7 @@ void Drive_Reverse_ToCM_Set_Delay(float target_cm, int base_pwm,
   HAL_Delay(delay_ms);
 }
 
-void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
+void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance){
   Motor_forward_reset_heading();
 
   float current_pwm = pwm;
@@ -1136,7 +1136,7 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
     if (cm_left < 10) {
       current_pwm = (int)(pwm * 0.5f); // Final crawl
 
-
+    }
     if (current_pwm < pwmMin)
       current_pwm = pwmMin;
 
@@ -1145,6 +1145,7 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
   }
 
   Motor_stop();
+
 }
 void Reset_Yaw_Integration(void) {
   yaw_angle = 0.0f;
@@ -1586,11 +1587,11 @@ void task_two_second_obs_check() {
   if (front_dist < TASK2_obs_2_clearance_distance) {
     Drive_Reverse_ToCM_Set_Delay(TASK2_obs_2_clearance_distance - front_dist,
                                  TASK2_PWM, 100);
-    TASK2_vertical_dist_now -= cm_travelled_reverse();
   } else if (front_dist >= TASK2_obs_2_clearance_distance) {
     Drive_Forward_Until_Obstacle(TASK2_PWM, TASK2_obs_2_clearance_distance);
-    TASK2_vertical_dist_now += cm_travelled_forward();
   }
+
+  TASK2_vertical_dist_now += front_dist + 10;
 }
 
 void task_two() {
@@ -1652,7 +1653,7 @@ void task_two() {
 
     // Failsafe to prevent undershooting wall when turning 180
     Motor_forward(TASK2_PWM);
-    HAL_Delay(750);
+    HAL_Delay(200);
 
     // use right IR, after turn move faster
     do {
@@ -1664,7 +1665,6 @@ void task_two() {
 
     // Turn right to be parallel with obstacle 2
     Turn_Car(90, TASK2_PWM, 45, 0);
-    reset_encoders();
     Motor_forward_reset_heading();
 
     // use left IR to clear side of obstacle 2
@@ -1690,10 +1690,12 @@ void task_two() {
     }
 
     Motor_forward_reset_heading();
+    reset_encoders();
 
     // Failsafe to prevent undershooting wall when turning 180
     Motor_forward(TASK2_PWM);
-    HAL_Delay(750);
+    HAL_Delay(200);
+    
 
     // use left IR, after turn move faster
     do {
@@ -1725,16 +1727,15 @@ void task_two_print_stats() {
 void task_two_return_to_start(char direction_obs1,
                               char initial_carpark_direction) {
 
-  TASK2_vertical_dist_now +=
-      TASK2_obs_2_clearance_distance + TASK2_distance_from_back_of_second_obs;
+  TASK2_vertical_dist_now += TASK2_distance_from_back_of_second_obs;
   task_two_print_stats();
 
-  // Drive forward slightly to get away from the carpark wall
-  Motor_forward_simple(TASK2_PWM, TASK2_PWM);
+  // // Drive forward slightly to get away from the carpark wall
+  // Motor_forward_simple(TASK2_PWM, TASK2_PWM);
 
-  // Do not increase this further - needs 50 cm clearance
-  HAL_Delay(125);
-  Motor_stop();
+  // // Do not increase this further - needs 50 cm clearance
+  // HAL_Delay(125);
+  // Motor_stop();
 
   // Calculate turn angle to face carpark general direction, based on current
   // surface
@@ -2163,7 +2164,7 @@ int main(void) {
 
   /****************************START************START*************START**********************
    */
-  task_two();
+ task_two();
 
   // uint32_t distance = HCSR04_Read();
 

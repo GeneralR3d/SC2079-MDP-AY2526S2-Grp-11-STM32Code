@@ -30,7 +30,7 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
 
 // VARIABLES FOR TASK 2
 #define TASK2_PWM 3000
-#define TASK2_RETURN_PWM 5000
+#define TASK2_SPRINT_PWM 5000
 #define SNAP_WAIT_MS 8000 // 8 seconds to retry once
 
 // TASK 2 - OBS1
@@ -1127,20 +1127,7 @@ void Drive_Reverse_ToCM_Set_Delay(float target_cm, int base_pwm,
 void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
   Motor_forward_reset_heading();
 
-  // float first, second, third;
   float current_pwm = pwm;
-
-  // if (direction == '<') {
-  //   /****left */
-  //   first = 600;
-  //   second = 1150;
-  //   third = 950;
-  // } else if (direction == '>') {
-  //   /****right */
-  //   first = 500;
-  //   second = 1350;
-  //   third = 750;
-  // }
 
   // forward for some distance
   while (1) {
@@ -1151,13 +1138,9 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
       break;
 
     // Speed ramping
-    if (cm_left < 5) {
-      current_pwm = (int)(pwm * 0.2f); // Final crawl
-    } else if (cm_left < 10) {
-      current_pwm = (int)(pwm * 0.3f);
-    } else if (cm_left < 15) {
-      current_pwm = (int)(pwm * 0.6f);
-    }
+    if (cm_left < 10) {
+      current_pwm = (int)(pwm * 0.5f); // Final crawl
+
 
     if (current_pwm < pwmMin)
       current_pwm = pwmMin;
@@ -1801,7 +1784,7 @@ void task_two_return_to_start(char direction_obs1,
       TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
 
   // Drive forward until arc point
-  Drive_Forward_ToCM_Set_Delay(return_dist, TASK2_RETURN_PWM, 100);
+  Drive_Forward_ToCM_Set_Delay(return_dist, TASK2_SPRINT_PWM, 100);
 
   // Turn in perpencidular to carpark
   if (initial_carpark_direction == '>') {
@@ -1833,7 +1816,7 @@ void task_two_return_to_start(char direction_obs1,
     Motor_stop();
 
     // Move forward boost to clear carpark wall
-    Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+    Motor_forward_simple(TASK2_SPRINT_PWM, TASK2_SPRINT_PWM);
     switch (TASK2_current_surface) {
     case TASK2_SURFACE_HPL: {
       if (initial_carpark_direction == '>')
@@ -1860,11 +1843,11 @@ void task_two_return_to_start(char direction_obs1,
   // Return straight to start position, stopping based on ultrasonic
   reset_encoders();
   Motor_forward_reset_heading();
-  Drive_Forward_Until_Obstacle(TASK2_RETURN_PWM,
+  Drive_Forward_Until_Obstacle(TASK2_SPRINT_PWM,
                                TASK2_carpark_wall_clearance_distance);
   Motor_stop();
 
-  // Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+  // Motor_forward_simple(TASK2_SPRINT_PWM, TASK2_SPRINT_PWM);
   //  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
   //	  HAL_Delay(100);
   //  }else{
@@ -1877,7 +1860,7 @@ void task_two_return_to_start(char direction_obs1,
   //		  || (current_direction == '<' && get_IR_distance_left() >
   // TASK2_carpark_side_IR_distance_threshold)) {
   //	  // Monitor
-  //	  Motor_forward_simple(TASK2_RETURN_PWM, TASK2_RETURN_PWM);
+  //	  Motor_forward_simple(TASK2_SPRINT_PWM, TASK2_SPRINT_PWM);
   //	  if(TASK2_current_surface == TASK2_SURFACE_OUTSIDE) {
   //		  HAL_Delay(100);
   //	  }else{

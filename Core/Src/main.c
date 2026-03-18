@@ -1064,14 +1064,9 @@ void Drive_Forward_ToCM_Set_Delay(float target_cm, int base_pwm,
 
     // Speed ramping (from your friend's code)
     int pwm = base_pwm;
-    if (cm_left > 30.0f)
-      pwm = base_pwm;
-    else if (cm_left > 10.0f)
-      pwm = (int)(base_pwm * 0.60f);
-    else if (cm_left > 3.0f)
-      pwm = (int)(base_pwm * 0.35f);
-    else
-      pwm = (int)(base_pwm * 0.25f);
+    if (cm_left < 10.0f)
+      pwm = base_pwm * 0.5f;
+
 
     if (pwm < pwmMin)
       pwm = pwmMin;
@@ -1659,9 +1654,9 @@ void task_two() {
     Motor_forward(TASK2_PWM);
     HAL_Delay(750);
 
-    // use right IR
+    // use right IR, after turn move faster
     do {
-      Motor_forward(TASK2_PWM);
+      Motor_forward(TASK2_SPRINT_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_right() < 60.0f);
 
@@ -1700,9 +1695,9 @@ void task_two() {
     Motor_forward(TASK2_PWM);
     HAL_Delay(750);
 
-    // use left IR
+    // use left IR, after turn move faster
     do {
-      Motor_forward(TASK2_PWM);
+      Motor_forward(TASK2_SPRINT_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_left() < 60.0f);
   }
@@ -1777,14 +1772,14 @@ void task_two_return_to_start(char direction_obs1,
   // Move straight until clear
   reset_encoders();
   Motor_forward_reset_heading();
-  HAL_Delay(500);
+
 
   // The car is now facing back at the carpark wall
   int return_dist =
       TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
 
   // Drive forward until arc point
-  Drive_Forward_ToCM_Set_Delay(return_dist, TASK2_SPRINT_PWM, 100);
+  Drive_Forward_ToCM_Set_Delay(return_dist, TASK2_SPRINT_PWM, 50);
 
   // Turn in perpencidular to carpark
   if (initial_carpark_direction == '>') {
@@ -1925,8 +1920,9 @@ void task_two_clear_first_obs_alternate(int pwm,
                                         char direction) {
   reset_encoders();
 
-  Drive_Forward_Until_Obstacle(pwm, obstacle_clearance_distance);
-  // no stop, turn and continue, HARDCODED
+  // sprint forward                                      
+  Drive_Forward_Until_Obstacle(TASK2_SPRINT_PWM, obstacle_clearance_distance);
+
   if (direction == '<') {
 
     Turn_Car(-45, pwm, -45, 0);

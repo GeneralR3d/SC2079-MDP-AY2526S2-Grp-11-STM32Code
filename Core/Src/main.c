@@ -192,7 +192,7 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two(char direction_obs1);
-void task_two_return_to_start(char direction_obs1, char previousDirection);
+void task_two_return_to_start(char direction_obs1, char direction_obs2, char previousDirection);
 void UART_arm();
 char UART_receive();
 char task_two_uart();
@@ -1687,7 +1687,7 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  char direction_obs2 = '<'; // task_two_uart()
+  char direction_obs2 = '>'; // task_two_uart()
 
 
   // Uncomment to test first obstacle only
@@ -1783,7 +1783,7 @@ void task_two(char direction_obs1) {
   //HAL_Delay(50);
   Motor_stop();
   TASK2_horizontal_dist_now = cm_travelled_forward();
-  task_two_return_to_start(direction_obs1, direction_obs2 == '<' ? '>' : '<');
+  task_two_return_to_start(direction_obs1, direction_obs2, direction_obs2 == '<' ? '>' : '<');
 
   // Inform RPI end of task 2
   Motor_stop();
@@ -1801,12 +1801,12 @@ void task_two_print_stats() {
 
   OLED_ShowString(0, 40, (uint8_t *)buf2);
   OLED_Refresh_Gram();
-  HAL_Delay(1000);
+ // HAL_Delay(1000);
 }
 
 // This is the entry point for returning to the start
 // IR sensor detects that second obstacle is cleared
-void task_two_return_to_start(char direction_obs1,
+void task_two_return_to_start(char direction_obs1, char direction_obs2,
                               char initial_carpark_direction) {
 
   TASK2_vertical_dist_now += TASK2_distance_from_back_of_second_obs;
@@ -1826,13 +1826,20 @@ void task_two_return_to_start(char direction_obs1,
   switch (TASK2_current_surface) {
   case TASK2_SURFACE_HPL: {
 
-    // initial carpark direction is right
-    if (initial_carpark_direction == '>')
+    // obstacle 2 is left
+    if (direction_obs2 == '<')
       if(TASK2_horizontal_dist_now > 90.0f)
-    	  turn_angle = 90;
+
+    	  if(direction_obs1 == '<') // long left left
+    		  turn_angle = 90;
+    	  else // long left right
+    		  turn_angle = 90;
       else
-    	  turn_angle = 85;
-    else // initial carpark direction is left
+    	  if(direction_obs1 == '<') // short left left
+    		  turn_angle = 80;
+    	  else // short left right
+    		  turn_angle = 85; // 85
+    else // initial carpark direction is left (obstacle dir is right)
       if(TASK2_horizontal_dist_now > 60.0f)
         // first turn was left
     	  if(direction_obs1 == '<')
@@ -1840,7 +1847,10 @@ void task_two_return_to_start(char direction_obs1,
     	  else
     		  turn_angle = 85; //85
       else // TODO: Test Right left , short obs2
-    	  turn_angle = 70;
+    	  if(direction_obs1 == '<')
+    		  turn_angle = 70;
+    	  else
+    		  turn_angle = 80;
   } break;
 
     // OUTDATED
@@ -1876,19 +1886,35 @@ void task_two_return_to_start(char direction_obs1,
   int return_dist =
       TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
 
+  // 157,48 for left left 60-60
+   // 246,48 for left left 60-150
   // 161 , 158
+  // 250,75 for right right 60-150
+  // 247.2, 65.4
   if(TASK2_vertical_dist_now < 180.0f) {
 	  if(direction_obs1 == '<')
-		  return_dist += 20.0f;
+		  if(direction_obs2 == '<')
+			  return_dist -= 70.0f; // left left
+		  else
+			  return_dist += 20.0f; // left right
 	  else
-		  return_dist -= 70.0f;
+		  if(direction_obs2 == '<')
+			  return_dist -= 70.0f; // right left
+		  else
+			  return_dist -= 70.0f; // right right
 
   // 252
   } else if (TASK2_vertical_dist_now < 275.0f) {
 	  if(direction_obs1 == '<')
-		  return_dist += 20.0f;
+		  if(direction_obs2 == '<')
+			  return_dist -= 70.0f; // left left
+		  else
+			  return_dist += 20.0f; // left right
 	  else
-		  return_dist -= 70.0f;
+		  if(direction_obs2 == '<')
+			  return_dist -= 70.0f; // right left
+		  else
+			  return_dist -= 70.0f; // right right
   }
 
   // Drive forward until arc point
@@ -1915,9 +1941,12 @@ void task_two_return_to_start(char direction_obs1,
     if(TASK2_horizontal_dist_now > 90.0f)
     	Motor_stop();
     else if(TASK2_horizontal_dist_now > 60.0f)
-    	Drive_Reverse_ToCM_SetDelay(30, alignment_pwm, 50);
+    	if(direction_obs1 == '>' && direction_obs2 == '>')
+    		Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
+    	else
+    		Drive_Reverse_ToCM_SetDelay(40, alignment_pwm, 50);
     else
-    	Drive_Reverse_ToCM_SetDelay(50, alignment_pwm, 50);
+    	Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
     Motor_stop();
 
     // Move forward until the carpark wall is found
@@ -2053,9 +2082,11 @@ void task_two_clear_first_obs_alternate(int pwm,
 
   if (direction == '<') {
 
-    Turn_Car(-45, pwm, -45, 0);
+    Turn_Car(45, pwm, -45, 0);
+    HAL_Delay(50);
     Turn_Car(35, pwm, 45, 0);
-
+    HAL_Delay(50);
+    Motor_stop();
 
 
     // Track start side of obstacle 1
@@ -2080,15 +2111,19 @@ void task_two_clear_first_obs_alternate(int pwm,
     Turn_Car(65, pwm, 45, 0);
     Motor_reverse_simple(pwm, pwm);
     HAL_Delay(250); // 250 -> 450
-    Turn_Car(55, pwm, -45, 0); // 60
+    Turn_Car(50, pwm, -45, 0); // 60, 55
+    HAL_Delay(50);
     // Motor_forward_simple(pwm, pwm);
     // HAL_Delay(100);
     Motor_stop();
 
   } else if (direction == '>') {
 
-    Turn_Car(-45, pwm, 45, 0);
+    Turn_Car(45, pwm, 45, 0);
+    HAL_Delay(50);
     Turn_Car(35, pwm, -45, 0);
+    HAL_Delay(50);
+    Motor_stop();
 
     // Track start side of obstacle 1
     do {
@@ -2113,7 +2148,7 @@ void task_two_clear_first_obs_alternate(int pwm,
     HAL_Delay(150);
     Motor_reverse_simple(pwm, pwm);
     HAL_Delay(150);
-    Turn_Car(60, pwm, 45, 0);
+    Turn_Car(70, pwm, 45, 0);
     Motor_forward_simple(pwm, pwm);
     HAL_Delay(100);
     Motor_stop();
@@ -2385,7 +2420,7 @@ char start;
 //     task_two(start);
 //   }
 // }
-task_two('<');
+task_two('>');
   // uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);

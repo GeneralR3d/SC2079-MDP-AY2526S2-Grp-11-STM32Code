@@ -2081,13 +2081,13 @@ void task_two_clear_first_obs_alternate(int pwm,
 
     // Track start side of obstacle 1
     do {
-      Motor_forward_simple(pwm, pwm);
+      Motor_forward_simple(TASK2_PWM, TASK2_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_left() > TASK2_obs_1_start_side_distance);
 
     // Track end side of obstacle 1
     do {
-      Motor_forward_simple(pwm, pwm);
+      Motor_forward_simple(TASK2_PWM, TASK2_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_left() < TASK2_obs_1_start_side_distance);
 

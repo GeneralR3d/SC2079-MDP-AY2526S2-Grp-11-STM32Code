@@ -1687,8 +1687,8 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  char direction_obs2 = task_two_uart();
-
+  //char direction_obs2 = task_two_uart();
+  char direction_obs2 = '<';
 
   // Uncomment to test first obstacle only
   //  Motor_stop();
@@ -1904,6 +1904,7 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
 			  return_dist -= 10.0f; // right right (need to test this)
 
   // 252
+
   } else if (TASK2_vertical_dist_now < 275.0f) {
 	  if(direction_obs1 == '<')
 		  if(direction_obs2 == '<')
@@ -2257,28 +2258,28 @@ void testing(char direction_obs1) {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
-  if(direction_obs1 == '<'){
-    Servo_SetAngle_Safe(-45,0);
-  }
-  else if(direction_obs1 == '>'){
-    Servo_SetAngle_Safe(45,0);
-  }
-  HAL_Delay(1000);
+//  if(direction_obs1 == '<'){
+//    Servo_SetAngle_Safe(-45,0);f
+//  }
+//  else if(direction_obs1 == '>'){
+//    Servo_SetAngle_Safe(45,0);
+//  }
+ // HAL_Delay(1000);
   // UART_arm(); // REMOVED: Since RxCpltCallback automatically re-arms, calling this again clears uart_rx_ready and drops characters received concurrently!
   // Send to RPI to take picture
-  send_message_over("snap\n");
-  char direction_obs2 = task_two_uart();
-  
-  // while(direction_obs2 != '<' && direction_obs2 != '>'){  
-  //     direction_obs2 = UART_receive();
-  // }
-
-  if(direction_obs2 == '<'){
-    Servo_SetAngle_Safe(-45,0);
-  }
-  else if(direction_obs2 == '>'){
-    Servo_SetAngle_Safe(45,0);
-  }
+  //send_message_over("snap\n");
+  //char direction_obs2 = task_two_uart();
+//  char direction_obs2 = '<';
+//  // while(direction_obs2 != '<' && direction_obs2 != '>'){
+//  //     direction_obs2 = UART_receive();
+//  // }
+//
+//  if(direction_obs2 == '<'){
+//    Servo_SetAngle_Safe(-45,0);
+//  }
+//  else if(direction_obs2 == '>'){
+//    Servo_SetAngle_Safe(45,0);
+//  }
 
 
 }
@@ -2419,15 +2420,15 @@ int main(void) {
    */
 char start;
 // UART_arm();  // REMOVED: Rx interrupt is continuously running from the callback, calling this again clears receive flags!
- while(1){
-   start = task_two_uart();
-   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
-   // Alternatively, just pass 's' to testing().
-   if(start == '<' || start == '>'){
-     task_two(start);
-   }
- }
-//task_two('>');
+// while(1){
+//   start = task_two_uart();
+//   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
+//   // Alternatively, just pass 's' to testing().
+//   if(start == '<' || start == '>'){
+//     task_two(start);
+//   }
+// }
+  task_two('>');
   // uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);

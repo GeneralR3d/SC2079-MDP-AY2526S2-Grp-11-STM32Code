@@ -1921,13 +1921,18 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
   Drive_Forward_ToCM_Set_Delay(return_dist, TASK2_SPRINT_PWM, 50);
 
   // Turn in perpencidular to carpark
-  if (initial_carpark_direction == '>') {
-    Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0);
-  } else if (initial_carpark_direction == '<') {
+  if (direction_obs2 == '<') {
+	  if(direction_obs1 == '<') {
+		  Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // left left
+	  }else{
+		  Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // right left
+	  }
+
+  } else if (direction_obs2 == '>') {
 	if(direction_obs1 == '<') {
-		Turn_Car(turn_angle + 5, TASK2_PWM, -45, 0);
+		Turn_Car(turn_angle + 5, TASK2_PWM, -45, 0); // left right
 	}else{
-		Turn_Car(turn_angle, TASK2_PWM, -45, 0);
+		Turn_Car(turn_angle, TASK2_PWM, -45, 0); // right right
 	}
   }
 
@@ -1944,7 +1949,7 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
     	if(direction_obs1 == '>' && direction_obs2 == '>')
     		Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
     	else
-    		Drive_Reverse_ToCM_SetDelay(40, alignment_pwm, 50);
+    		Drive_Reverse_ToCM_SetDelay(50, alignment_pwm, 50);
     else
     	Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
     Motor_stop();

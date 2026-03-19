@@ -20,10 +20,14 @@ UART_HandleTypeDef huart3;
 // UART IT receive state
 static volatile uint8_t uart_rx_byte = 0;
 static volatile uint8_t uart_rx_ready = 0;
+static volatile char valid_cmd = 0;
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
   if (huart == &huart3) {
-    uart_rx_ready = 1;
+    if (uart_rx_byte == '<' || uart_rx_byte == '>') {
+      valid_cmd = uart_rx_byte;
+      uart_rx_ready = 1;
+    }
     HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart_rx_byte, 1);
   }
 }
@@ -50,7 +54,7 @@ const float TASK2_obstacle2_too_short_threshold = 40.0f;
 // Threshold for checking if carpark side is clear
 const float TASK2_carpark_side_IR_distance_threshold = 40.0f;
 // Final brake ultrasonic distance threshold
-const float TASK2_carpark_wall_clearance_distance = 17.5f;
+const float TASK2_carpark_wall_clearance_distance = 25.5f;
 
 typedef enum {
   TASK2_SURFACE_HPL,
@@ -183,10 +187,11 @@ void Turn_Car(float target_deg, int pwmVal, int steer_angle, float target_cm);
 void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
-void task_two();
+void task_two(char direction_obs1);
 void task_two_return_to_start(char direction_obs1, char previousDirection);
 void UART_arm();
 char UART_receive();
+char task_two_uart();
 
 /*Purpose: Directly sets the PWM pulse width in microseconds
 
@@ -380,7 +385,7 @@ void Motor_forward(int pwmVal) {
 
   // --- PID controller gains ---
  float Kp_h = 40.0f; // proportional gain //old
- float Ki_h = 4.0f;  // integral gain //old
+ float Ki_h = 3.0f;  // integral gain //old
  float Kd_h = 3.5f;  // derivative gain  old
 
   // --- PID controller gains ---
@@ -1622,9 +1627,10 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
 
 void task_two_second_obs_check() {
   // find the acceptable distance to the 2nd obstacle
+
   reset_encoders();
   float front_dist = HCSR04_Read();
-  HAL_Delay(100);
+  HAL_Delay(200);
 
   // SEND to rpi for 2nd obstacle while moving
   // task_two_uart()
@@ -1640,7 +1646,7 @@ void task_two_second_obs_check() {
   TASK2_vertical_dist_now += front_dist + 10;
 }
 
-void task_two() {
+void task_two(char direction_obs1) {
 
   send_message_over("ACK\n");
 
@@ -1649,16 +1655,18 @@ void task_two() {
   TASK2_horizontal_dist_now = 0;
 
   // listen to rpi for 1st obstacle
-  char direction_obs1 = '<'; // task_two_uart()
+  //char direction_obs1 = '<'; // task_two_uart()
 
   // drive around 1st obstacle
   task_two_clear_first_obs_alternate(TASK2_PWM, TASK2_obs_1_clearance_distance,
                                      direction_obs1);
 
-  char direction_obs2 = '<'; // task_two_uart()
-
   // Reverse and move forward until 2nd obstacle is within clearance distance
   task_two_second_obs_check();
+    send_message_over("snap\n");
+
+  char direction_obs2 = task_two_uart(); // task_two_uart()
+
 
   // Uncomment to test first obstacle only
   //  Motor_stop();
@@ -1699,7 +1707,7 @@ void task_two() {
 
     // Failsafe to prevent undershooting wall when turning 180
     Motor_forward(TASK2_PWM);
-    HAL_Delay(200);
+    HAL_Delay(500);
 
     // use right IR, after turn move faster
     do {
@@ -1749,9 +1757,10 @@ void task_two() {
       HAL_Delay(30);
     } while (get_IR_distance_left() < 60.0f);
   }
-
-  TASK2_horizontal_dist_now = cm_travelled_forward();
+  Motor_reverse_simple(1000,1000);
+  HAL_Delay(50);
   Motor_stop();
+  TASK2_horizontal_dist_now = cm_travelled_forward();
   task_two_return_to_start(direction_obs1, direction_obs2 == '<' ? '>' : '<');
 
   // Inform RPI end of task 2
@@ -1790,7 +1799,7 @@ void task_two_return_to_start(char direction_obs1,
   switch (TASK2_current_surface) {
   case TASK2_SURFACE_HPL: {
     if (initial_carpark_direction == '>')
-      turn_angle = 75;
+      turn_angle = 85;
     else
       turn_angle = 85;
   } break;
@@ -1842,8 +1851,7 @@ void task_two_return_to_start(char direction_obs1,
 
     const float alignment_pwm = 2500;
 
-    Motor_reverse_simple(alignment_pwm, alignment_pwm);
-    HAL_Delay(1000);
+    Drive_Reverse_ToCM(60, alignment_pwm);
     Motor_stop();
 
     // Move forward until the carpark wall is found
@@ -1930,6 +1938,7 @@ void task_two_return_to_start(char direction_obs1,
 // work so the byte is captured in the background. Safe to call multiple times.
 void UART_arm() {
   uart_rx_ready = 0;
+  valid_cmd = 0;
   HAL_UART_Receive_IT(&huart3, (uint8_t *)&uart_rx_byte, 1);
 }
 
@@ -1944,7 +1953,8 @@ char UART_receive() {
     while (HAL_GetTick() - t0 < SNAP_WAIT_MS) {
       if (uart_rx_ready) {
         uart_rx_ready = 0;
-        char ch = uart_rx_byte;
+        char ch = valid_cmd;
+        valid_cmd = 0;
         if (ch == '<' || ch == '>') {
           send_message_over("ACK\n");
           return ch;
@@ -2069,13 +2079,78 @@ void front_back_test() {
 
   HAL_Delay(delay_after_front_back);
 }
+char task_two_uart() {
 
-void testing() {
+
+      int cmd_i = 0;
+      char cmd[64]; 
+      uint32_t attempt_start = HAL_GetTick();
+
+      // Wait for X seconds between attempts
+      while (HAL_GetTick() - attempt_start < SNAP_WAIT_MS) {
+
+        uint8_t ch;
+        if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+
+          if (ch == '\n' || ch == '\r') {
+            if (cmd_i > 0) {
+              cmd[cmd_i] = '\0';
+
+              char type;
+              sscanf(cmd, "%c", &type);
+              send_message_over(cmd);
+              if (type == '>' || type == '<' || type == 's') {
+                send_message_over("ACK\n");
+                return type;
+              } else {
+                send_message_over("error\n");
+                send_message_over("ACK\n");
+                cmd_i = 0;
+              }
+            }
+          } else {
+            if (cmd_i < CMD_BUF_LEN - 1) {
+              cmd[cmd_i++] = ch;
+            }
+          }
+        }
+      }
+
+  // Timeout case when both attempts fail
+  send_message_over("timeout\n");
+  return 0;
+}
+
+
+void testing(char direction_obs1) {
   // Turn_Car_Reverse(90,3000,45,0);
   // HAL_Delay(10000);
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
+  if(direction_obs1 == '<'){
+    Servo_SetAngle_Safe(-45,0);
+  }
+  else if(direction_obs1 == '>'){
+    Servo_SetAngle_Safe(45,0);
+  }
+  HAL_Delay(1000);
+  // UART_arm(); // REMOVED: Since RxCpltCallback automatically re-arms, calling this again clears uart_rx_ready and drops characters received concurrently!
+  // Send to RPI to take picture
+  send_message_over("snap\n");
+  char direction_obs2 = task_two_uart();
+  
+  // while(direction_obs2 != '<' && direction_obs2 != '>'){  
+  //     direction_obs2 = UART_receive();
+  // }
+
+  if(direction_obs2 == '<'){
+    Servo_SetAngle_Safe(-45,0);
+  }
+  else if(direction_obs2 == '>'){
+    Servo_SetAngle_Safe(45,0);
+  }
+
 
 }
 
@@ -2201,18 +2276,29 @@ int main(void) {
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
+  // UART_arm(); // Commented out because task_two_uart uses polling (HAL_UART_Receive), and UART_arm starts an interrupt that will cause HAL_BUSY
+
   Servo_SetAngle_Safe(0, 0);
   HAL_Delay(1000);
   OLED_Clear();
 
   /********************************our testing*** */
 
-  testing();
+  // testing();
 
   /****************************START************START*************START**********************
    */
- task_two();
-
+char start;
+// UART_arm();  // REMOVED: Rx interrupt is continuously running from the callback, calling this again clears receive flags!
+while(1){
+  start = task_two_uart();
+  // We can use 's' to start the testing, providing a default direction or skipping the first turn.
+  // Alternatively, just pass 's' to testing().
+  if(start == '<' || start == '>'){
+    task_two(start);
+  }
+}
+// task_two();
   // uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);

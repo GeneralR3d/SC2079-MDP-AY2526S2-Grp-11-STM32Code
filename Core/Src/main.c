@@ -1687,7 +1687,13 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  char direction_obs2 = task_two_uart();
+
+
+    char direction_obs2 = task_two_uart();
+    if(direction_obs2 == 0) {
+    	direction_obs2 = '<';
+    }
+ // char direction_obs2 = task_two_uart();
   //char direction_obs2 = '>';
 
   // Uncomment to test first obstacle only
@@ -1908,7 +1914,7 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
 		  if(direction_obs2 == '<')
 			  return_dist += 4.0f; // right left was -65 at 10:44pm
 		  else
-			  return_dist -= 60.0f; // right right (need to test this)
+			  return_dist += 10.0f; // right right (need to test this)
 
   // 252
   } else if (TASK2_vertical_dist_now < 240.0f) {
@@ -2452,8 +2458,11 @@ char start;
    // Alternatively, just pass 's' to testing().
    if(start == '<' || start == '>'){
      task_two(start);
+     Motor_stop();
+     break;
    }
  }
+ Motor_stop();
   //task_two('<');
   // uint32_t distance = HCSR04_Read();
 

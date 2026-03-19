@@ -1687,8 +1687,8 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  //char direction_obs2 = task_two_uart();
-  char direction_obs2 = '<';
+  char direction_obs2 = task_two_uart();
+  //char direction_obs2 = '>';
 
   // Uncomment to test first obstacle only
   //  Motor_stop();
@@ -1837,7 +1837,7 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
     		  turn_angle = 90;
       else
     	  if(direction_obs1 == '<') // short left left
-    		  turn_angle = 80;
+    		  turn_angle = 90;
     	  else // short left right
     		  turn_angle = 85; // 85
     else // initial carpark direction is left (obstacle dir is right)
@@ -1906,7 +1906,7 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
 			  return_dist += 20.0f; // left right
 	  else
 		  if(direction_obs2 == '<')
-			  return_dist -= 65.0f; // right left
+			  return_dist += 4.0f; // right left was -65 at 10:44pm
 		  else
 			  return_dist -= 60.0f; // right right (need to test this)
 
@@ -1943,7 +1943,7 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
   // Turn in perpencidular to carpark
   if (direction_obs2 == '<') {
 	  if(direction_obs1 == '<') {
-		  Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // left left
+		  Turn_Car(turn_angle + 10, TASK2_PWM, 45, 0); // left left
 	  }else{
 		  Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // right left
 	  }
@@ -2142,7 +2142,7 @@ void task_two_clear_first_obs_alternate(int pwm,
      // 75, 70
     Turn_Car(65, pwm, 45, 0);
     Motor_reverse_simple(pwm, pwm);
-    HAL_Delay(200); // 250 -> 450 -> 250 ->100
+    HAL_Delay(150); // 250 -> 450 -> 250 ->100
     Turn_Car(55, pwm, -45, 0); // 60, 55
     HAL_Delay(50);
     // Motor_forward_simple(pwm, pwm);
@@ -2446,15 +2446,15 @@ int main(void) {
    */
 char start;
 // UART_arm();  // REMOVED: Rx interrupt is continuously running from the callback, calling this again clears receive flags!
-// while(1){
-//   start = task_two_uart();
-//   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
-//   // Alternatively, just pass 's' to testing().
-//   if(start == '<' || start == '>'){
-//     task_two(start);
-//   }
-// }
-  task_two('<');
+ while(1){
+   start = task_two_uart();
+   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
+   // Alternatively, just pass 's' to testing().
+   if(start == '<' || start == '>'){
+     task_two(start);
+   }
+ }
+  //task_two('<');
   // uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);

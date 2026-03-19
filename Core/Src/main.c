@@ -1825,18 +1825,21 @@ void task_two_return_to_start(char direction_obs1,
 
   switch (TASK2_current_surface) {
   case TASK2_SURFACE_HPL: {
+
+    // initial carpark direction is right
     if (initial_carpark_direction == '>')
       if(TASK2_horizontal_dist_now > 90.0f)
     	  turn_angle = 90;
       else
     	  turn_angle = 85;
-    else
+    else // initial carpark direction is left
       if(TASK2_horizontal_dist_now > 60.0f)
+        // first turn was left
     	  if(direction_obs1 == '<')
     		  turn_angle = 75;
     	  else
     		  turn_angle = 85; //85
-      else
+      else // TODO: Test Right left , short obs2
     	  turn_angle = 70;
   } break;
 
@@ -2046,13 +2049,13 @@ void task_two_clear_first_obs_alternate(int pwm,
 
     // Track start side of obstacle 1
     do {
-      Motor_forward_simple(pwm, pwm);
+      Motor_forward_simple(TASK2_PWM, TASK2_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_right() > TASK2_obs_1_start_side_distance);
 
     // Track end side of obstacle 1
     do {
-      Motor_forward_simple(pwm, pwm);
+      Motor_forward_simple(TASK2_PWM, TASK2_PWM);
       HAL_Delay(30);
     } while (get_IR_distance_right() < TASK2_obs_1_start_side_distance);
 

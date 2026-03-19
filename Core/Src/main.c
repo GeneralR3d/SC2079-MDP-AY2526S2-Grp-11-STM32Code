@@ -1687,8 +1687,11 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  //char direction_obs2 = task_two_uart();
-  char direction_obs2 = '<';
+  char direction_obs2 = task_two_uart();
+  if(direction_obs2 == 0) {
+    direction_obs2 = '<';
+  }
+  //char direction_obs2 = '<';
 
   // Uncomment to test first obstacle only
   //  Motor_stop();
@@ -2420,15 +2423,18 @@ int main(void) {
    */
 char start;
 // UART_arm();  // REMOVED: Rx interrupt is continuously running from the callback, calling this again clears receive flags!
-// while(1){
-//   start = task_two_uart();
-//   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
-//   // Alternatively, just pass 's' to testing().
-//   if(start == '<' || start == '>'){
-//     task_two(start);
-//   }
-// }
-  task_two('>');
+while(1){
+  start = task_two_uart();
+  // We can use 's' to start the testing, providing a default direction or skipping the first turn.
+  // Alternatively, just pass 's' to testing().
+  if(start == '<' || start == '>'){
+    task_two(start);
+    Motor_stop();
+    break;
+  }
+}
+Motor_stop();
+  //task_two('>');
   // uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);

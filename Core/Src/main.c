@@ -1687,7 +1687,7 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  char direction_obs2 = '>'; // task_two_uart()
+  char direction_obs2 = task_two_uart();
 
 
   // Uncomment to test first obstacle only
@@ -1899,9 +1899,9 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
 			  return_dist += 20.0f; // left right
 	  else
 		  if(direction_obs2 == '<')
-			  return_dist -= 70.0f; // right left
+			  return_dist -= 10.0f; // right left
 		  else
-			  return_dist -= 70.0f; // right right
+			  return_dist -= 10.0f; // right right (need to test this)
 
   // 252
   } else if (TASK2_vertical_dist_now < 275.0f) {
@@ -2144,11 +2144,13 @@ void task_two_clear_first_obs_alternate(int pwm,
     // Possible to send snapshot here to RPI
     // send_message_over("snap\n");
 //75
-    Turn_Car(75, pwm, -45, 0);
+
+    // 75-70
+    Turn_Car(65, pwm, -45, 0);
     HAL_Delay(150);
     Motor_reverse_simple(pwm, pwm);
     HAL_Delay(150);
-    Turn_Car(70, pwm, 45, 0);
+    Turn_Car(60, pwm, 45, 0);
     Motor_forward_simple(pwm, pwm);
     HAL_Delay(100);
     Motor_stop();
@@ -2412,15 +2414,15 @@ int main(void) {
    */
 char start;
 // UART_arm();  // REMOVED: Rx interrupt is continuously running from the callback, calling this again clears receive flags!
-// while(1){
-//   start = task_two_uart();
-//   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
-//   // Alternatively, just pass 's' to testing().
-//   if(start == '<' || start == '>'){
-//     task_two(start);
-//   }
-// }
-task_two('>');
+ while(1){
+   start = task_two_uart();
+   // We can use 's' to start the testing, providing a default direction or skipping the first turn.
+   // Alternatively, just pass 's' to testing().
+   if(start == '<' || start == '>'){
+     task_two(start);
+   }
+ }
+//task_two('>');
   // uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);

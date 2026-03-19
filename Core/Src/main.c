@@ -1687,7 +1687,7 @@ void task_two(char direction_obs1) {
   task_two_second_obs_check();
     send_message_over("snap\n");
 
-  char direction_obs2 = '>'; // task_two_uart()
+  char direction_obs2 = '<'; // task_two_uart()
 
 
   // Uncomment to test first obstacle only
@@ -1794,7 +1794,7 @@ void task_two_print_stats() {
   char buf[100];
   snprintf(buf, sizeof(buf), "V:%.1f H:%.1f", TASK2_vertical_dist_now,
            TASK2_horizontal_dist_now);
-  OLED_ShowString(0, 20, (uint8_t *)buf);
+  OLED_ShowString(0, 10, (uint8_t *)buf);
   char buf2[100];
   snprintf(buf2, sizeof(buf2), "V1:%.1f V2:%.1f", TASK2_vertical_first_part,
 		  TASK2_vertical_first_part_2);
@@ -1876,12 +1876,19 @@ void task_two_return_to_start(char direction_obs1,
   int return_dist =
       TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
 
-  // 161
+  // 161 , 158
   if(TASK2_vertical_dist_now < 180.0f) {
-	  return_dist -= 70.0f;
+	  if(direction_obs1 == '<')
+		  return_dist += 20.0f;
+	  else
+		  return_dist -= 70.0f;
+
   // 252
   } else if (TASK2_vertical_dist_now < 275.0f) {
-	  return_dist -= 70.0f;
+	  if(direction_obs1 == '<')
+		  return_dist += 20.0f;
+	  else
+		  return_dist -= 70.0f;
   }
 
   // Drive forward until arc point
@@ -1891,13 +1898,17 @@ void task_two_return_to_start(char direction_obs1,
   if (initial_carpark_direction == '>') {
     Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0);
   } else if (initial_carpark_direction == '<') {
-    Turn_Car(turn_angle, TASK2_PWM, -45, 0);
+	if(direction_obs1 == '<') {
+		Turn_Car(turn_angle + 5, TASK2_PWM, -45, 0);
+	}else{
+		Turn_Car(turn_angle, TASK2_PWM, -45, 0);
+	}
   }
 
   // Based on length of obstacle2, first reverse then move forward until the
   // carpark wall is found If obstacle2 is too short, it will skip this step
   // and assume that carpark wall is already clear
-  if (TASK2_horizontal_dist_now > TASK2_obstacle2_too_short_threshold) {
+ // if (TASK2_horizontal_dist_now > TASK2_obstacle2_too_short_threshold) {
 
     const float alignment_pwm = 2750;
 
@@ -1934,7 +1945,7 @@ void task_two_return_to_start(char direction_obs1,
       break;
     }
     Motor_stop();
-  }
+ // }
 
   // Turn into carpark bay in the final stretch
   if (initial_carpark_direction == '>') {
@@ -2065,11 +2076,11 @@ void task_two_clear_first_obs_alternate(int pwm,
     // Possible to send snapshot here to RPI
     // send_message_over("snap\n");
 
-     // 75
-    Turn_Car(70, pwm, 45, 0);
+     // 75, 70
+    Turn_Car(65, pwm, 45, 0);
     Motor_reverse_simple(pwm, pwm);
-    HAL_Delay(450); // 250
-    Turn_Car(60, pwm, -45, 0);
+    HAL_Delay(250); // 250 -> 450
+    Turn_Car(55, pwm, -45, 0); // 60
     // Motor_forward_simple(pwm, pwm);
     // HAL_Delay(100);
     Motor_stop();
@@ -2119,6 +2130,9 @@ void task_two_clear_first_obs_alternate(int pwm,
   TASK2_vertical_dist_now += cm_travelled_forward() +
                              obstacle_clearance_distance + 10 +
                              TASK2_distance_from_back_of_first_obs;
+  Motor_reverse_simple(1000, 1000);
+  HAL_Delay(150);
+  Motor_stop();
 }
 
 

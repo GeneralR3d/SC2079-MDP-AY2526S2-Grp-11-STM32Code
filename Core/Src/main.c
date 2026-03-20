@@ -192,7 +192,8 @@ void Turn_Car_Reverse(float target_deg, int pwmVal, int steer_angle,
                       float target_cm);
 uint16_t Servo_SetAngle_Safe(int16_t angle_deg, uint8_t gradual);
 void task_two(char direction_obs1);
-void task_two_return_to_start(char direction_obs1, char direction_obs2, char previousDirection);
+void task_two_return_to_start(char direction_obs1, char direction_obs2,
+                              char previousDirection);
 void UART_arm();
 char UART_receive();
 char task_two_uart();
@@ -328,11 +329,11 @@ void Motor_reverse_simple(int pwmValL, int pwmValR) {
 
 void spin_back_right_on_the_spot(int pwmVal) {
   Steering_ToUS(45);
-  // Left motor forward, right motor reverse → spins car right on the spot
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal); // Motor A forward
-  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmVal); // Motor D reverse
-  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
+  // Left motor reverse, right motor forward → spins rear of car to the right
+  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, 0);
+  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, pwmVal); // Motor A (left) reverse
+  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, 0);
+  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0); // Motor D (right) forward
 }
 
 // THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
@@ -1063,8 +1064,6 @@ void Drive_Reverse_ToCM(float target_cm, int base_pwm) {
   HAL_Delay(1000);
 }
 
-
-
 void Drive_Reverse_ToCM_SetDelay(float target_cm, int base_pwm, int delay_ms) {
   reset_encoders();
   Motor_forward_reset_heading();
@@ -1086,21 +1085,20 @@ void Drive_Reverse_ToCM_SetDelay(float target_cm, int base_pwm, int delay_ms) {
     if (cm_left < 10.0f)
       pwm = base_pwm * 0.5f;
 
-
     if (pwm < pwmMin)
       pwm = pwmMin;
-//    int pwm = base_pwm;
-//    if (cm_left > 30.0f)
-//      pwm = base_pwm;
-//    else if (cm_left > 10.0f)
-//      pwm = (int)(base_pwm * 0.60f);
-//    else if (cm_left > 3.0f)
-//      pwm = (int)(base_pwm * 0.35f);
-//    else
-//      pwm = (int)(base_pwm * 0.25f);
-//
-//    if (pwm < pwmMin)
-//      pwm = pwmMin;
+    //    int pwm = base_pwm;
+    //    if (cm_left > 30.0f)
+    //      pwm = base_pwm;
+    //    else if (cm_left > 10.0f)
+    //      pwm = (int)(base_pwm * 0.60f);
+    //    else if (cm_left > 3.0f)
+    //      pwm = (int)(base_pwm * 0.35f);
+    //    else
+    //      pwm = (int)(base_pwm * 0.25f);
+    //
+    //    if (pwm < pwmMin)
+    //      pwm = pwmMin;
 
     //     Motor_reverse_advanced(pwm);
     // Motor_reverse(pwm);
@@ -1148,7 +1146,6 @@ void Drive_Forward_ToCM_Set_Delay(float target_cm, int base_pwm,
     int pwm = base_pwm;
     if (cm_left < 10.0f)
       pwm = base_pwm * 0.5f;
-
 
     if (pwm < pwmMin)
       pwm = pwmMin;
@@ -1201,7 +1198,7 @@ void Drive_Reverse_ToCM_Set_Delay(float target_cm, int base_pwm,
   HAL_Delay(delay_ms);
 }
 
-void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance){
+void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance) {
   Motor_forward_reset_heading();
 
   float current_pwm = pwm;
@@ -1217,7 +1214,6 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance){
     // Speed ramping
     if (cm_left < 10) {
       current_pwm = (int)(pwm * 0.5f); // Final crawl
-
     }
     if (current_pwm < pwmMin)
       current_pwm = pwmMin;
@@ -1227,7 +1223,6 @@ void Drive_Forward_Until_Obstacle(int pwm, float obstacle_clearance_distance){
   }
 
   Motor_stop();
-
 }
 void Reset_Yaw_Integration(void) {
   yaw_angle = 0.0f;
@@ -1686,7 +1681,7 @@ void task_two(char direction_obs1) {
   TASK2_horizontal_dist_now = 0;
 
   // listen to rpi for 1st obstacle
-  //char direction_obs1 = '<'; // task_two_uart()
+  // char direction_obs1 = '<'; // task_two_uart()
 
   // drive around 1st obstacle
   task_two_clear_first_obs_alternate(TASK2_PWM, TASK2_obs_1_clearance_distance,
@@ -1694,13 +1689,13 @@ void task_two(char direction_obs1) {
 
   // Reverse and move forward until 2nd obstacle is within clearance distance
   task_two_second_obs_check();
-    send_message_over("snap\n");
+  send_message_over("snap\n");
 
   char direction_obs2 = task_two_uart();
-  if(direction_obs2 == 0) {
+  if (direction_obs2 == 0) {
     direction_obs2 = '<';
   }
-  //char direction_obs2 = '<';
+  // char direction_obs2 = '<';
 
   // Uncomment to test first obstacle only
   //  Motor_stop();
@@ -1783,7 +1778,6 @@ void task_two(char direction_obs1) {
     // Failsafe to prevent undershooting wall when turning 180
     Motor_forward(TASK2_SPRINT_PWM);
     HAL_Delay(400);
-    
 
     // use left IR, after turn move faster
     do {
@@ -1791,11 +1785,12 @@ void task_two(char direction_obs1) {
       HAL_Delay(30);
     } while (get_IR_distance_left() < 60.0f);
   }
-  //Motor_reverse_simple(1000,1000);
-  //HAL_Delay(50);
+  // Motor_reverse_simple(1000,1000);
+  // HAL_Delay(50);
   Motor_stop();
   TASK2_horizontal_dist_now = cm_travelled_forward();
-  task_two_return_to_start(direction_obs1, direction_obs2, direction_obs2 == '<' ? '>' : '<');
+  task_two_return_to_start(direction_obs1, direction_obs2,
+                           direction_obs2 == '<' ? '>' : '<');
 
   // Inform RPI end of task 2
   Motor_stop();
@@ -1809,11 +1804,11 @@ void task_two_print_stats() {
   OLED_ShowString(0, 10, (uint8_t *)buf);
   char buf2[100];
   snprintf(buf2, sizeof(buf2), "V1:%.1f V2:%.1f", TASK2_vertical_first_part,
-		  TASK2_vertical_first_part_2);
+           TASK2_vertical_first_part_2);
 
   OLED_ShowString(0, 40, (uint8_t *)buf2);
   OLED_Refresh_Gram();
- // HAL_Delay(1000);
+  // HAL_Delay(1000);
 }
 
 // This is the entry point for returning to the start
@@ -1840,29 +1835,28 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
 
     // obstacle 2 is left
     if (direction_obs2 == '<')
-      if(TASK2_horizontal_dist_now > 90.0f)
+      if (TASK2_horizontal_dist_now > 90.0f)
 
-    	  if(direction_obs1 == '<') // long left left
-    		  turn_angle = 90;
-    	  else // long left right
-    		  turn_angle = 90;
-      else
-    	  if(direction_obs1 == '<') // short left left
-    		  turn_angle = 80;
-    	  else // short left right
-    		  turn_angle = 85; // 85
+        if (direction_obs1 == '<') // long left left
+          turn_angle = 90;
+        else // long left right
+          turn_angle = 90;
+      else if (direction_obs1 == '<') // short left left
+        turn_angle = 80;
+      else               // short left right
+        turn_angle = 85; // 85
     else // initial carpark direction is left (obstacle dir is right)
-      if(TASK2_horizontal_dist_now > 60.0f)
+      if (TASK2_horizontal_dist_now > 60.0f)
         // first turn was left
-    	  if(direction_obs1 == '<')
-    		  turn_angle = 75;
-    	  else
-    		  turn_angle = 85; //85
-      else // TODO: Test Right left , short obs2
-    	  if(direction_obs1 == '<')
-    		  turn_angle = 70;
-    	  else
-    		  turn_angle = 80;
+        if (direction_obs1 == '<')
+          turn_angle = 75;
+        else
+          turn_angle = 85; // 85
+      else                 // TODO: Test Right left , short obs2
+        if (direction_obs1 == '<')
+          turn_angle = 70;
+        else
+          turn_angle = 80;
   } break;
 
     // OUTDATED
@@ -1890,44 +1884,41 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
   reset_encoders();
   Motor_forward_reset_heading();
 
-
   // The car is now facing back at the carpark wall
 
-  //if(TASK2_horizontal_dist_now > )
+  // if(TASK2_horizontal_dist_now > )
 
   int return_dist =
       TASK2_vertical_dist_now - TASK2_vertical_dist_return_arc_buffer;
 
   // 157,48 for left left 60-60
-   // 246,48 for left left 60-150
+  // 246,48 for left left 60-150
   // 161 , 158
   // 250,75 for right right 60-150
   // 247.2, 65.4
-  if(TASK2_vertical_dist_now < 180.0f) {
-	  if(direction_obs1 == '<')
-		  if(direction_obs2 == '<')
-			  return_dist -= 70.0f; // left left
-		  else
-			  return_dist += 20.0f; // left right
-	  else
-		  if(direction_obs2 == '<')
-			  return_dist -= 10.0f; // right left
-		  else
-			  return_dist -= 10.0f; // right right (need to test this)
+  if (TASK2_vertical_dist_now < 180.0f) {
+    if (direction_obs1 == '<')
+      if (direction_obs2 == '<')
+        return_dist -= 70.0f; // left left
+      else
+        return_dist += 20.0f; // left right
+    else if (direction_obs2 == '<')
+      return_dist -= 10.0f; // right left
+    else
+      return_dist -= 10.0f; // right right (need to test this)
 
-  // 252
+    // 252
 
   } else if (TASK2_vertical_dist_now < 275.0f) {
-	  if(direction_obs1 == '<')
-		  if(direction_obs2 == '<')
-			  return_dist -= 70.0f; // left left
-		  else
-			  return_dist += 20.0f; // left right
-	  else
-		  if(direction_obs2 == '<')
-			  return_dist -= 70.0f; // right left
-		  else
-			  return_dist -= 70.0f; // right right
+    if (direction_obs1 == '<')
+      if (direction_obs2 == '<')
+        return_dist -= 70.0f; // left left
+      else
+        return_dist += 20.0f; // left right
+    else if (direction_obs2 == '<')
+      return_dist -= 70.0f; // right left
+    else
+      return_dist -= 70.0f; // right right
   }
 
   // Drive forward until arc point
@@ -1935,64 +1926,64 @@ void task_two_return_to_start(char direction_obs1, char direction_obs2,
 
   // Turn in perpencidular to carpark
   if (direction_obs2 == '<') {
-	  if(direction_obs1 == '<') {
-		  Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // left left
-	  }else{
-		  Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // right left
-	  }
+    if (direction_obs1 == '<') {
+      Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // left left
+    } else {
+      Turn_Car(turn_angle + 5, TASK2_PWM, 45, 0); // right left
+    }
 
   } else if (direction_obs2 == '>') {
-	if(direction_obs1 == '<') {
-		Turn_Car(turn_angle + 5, TASK2_PWM, -45, 0); // left right
-	}else{
-		Turn_Car(turn_angle, TASK2_PWM, -45, 0); // right right
-	}
+    if (direction_obs1 == '<') {
+      Turn_Car(turn_angle + 5, TASK2_PWM, -45, 0); // left right
+    } else {
+      Turn_Car(turn_angle, TASK2_PWM, -45, 0); // right right
+    }
   }
 
   // Based on length of obstacle2, first reverse then move forward until the
   // carpark wall is found If obstacle2 is too short, it will skip this step
   // and assume that carpark wall is already clear
- // if (TASK2_horizontal_dist_now > TASK2_obstacle2_too_short_threshold) {
+  // if (TASK2_horizontal_dist_now > TASK2_obstacle2_too_short_threshold) {
 
-    const float alignment_pwm = 2750;
+  const float alignment_pwm = 2750;
 
-    if(TASK2_horizontal_dist_now > 90.0f)
-    	Motor_stop();
-    else if(TASK2_horizontal_dist_now > 60.0f)
-    	if(direction_obs1 == '>' && direction_obs2 == '>')
-    		Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
-    	else
-    		Drive_Reverse_ToCM_SetDelay(50, alignment_pwm, 50);
+  if (TASK2_horizontal_dist_now > 90.0f)
+    Motor_stop();
+  else if (TASK2_horizontal_dist_now > 60.0f)
+    if (direction_obs1 == '>' && direction_obs2 == '>')
+      Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
     else
-    	Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
-    Motor_stop();
+      Drive_Reverse_ToCM_SetDelay(50, alignment_pwm, 50);
+  else
+    Drive_Reverse_ToCM_SetDelay(60, alignment_pwm, 50);
+  Motor_stop();
 
-    // Move forward until the carpark wall is found
-    do {
-      Motor_forward_simple(TASK2_PWM, TASK2_PWM);
-      HAL_Delay(30); // polling rate for IR sensor
-    } while (
-        (initial_carpark_direction == '>' &&
-         get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) ||
-        (initial_carpark_direction == '<' &&
-         get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
-    Motor_stop();
+  // Move forward until the carpark wall is found
+  do {
+    Motor_forward_simple(TASK2_PWM, TASK2_PWM);
+    HAL_Delay(30); // polling rate for IR sensor
+  } while (
+      (initial_carpark_direction == '>' &&
+       get_IR_distance_left() > TASK2_carpark_side_IR_distance_threshold) ||
+      (initial_carpark_direction == '<' &&
+       get_IR_distance_right() > TASK2_carpark_side_IR_distance_threshold));
+  Motor_stop();
 
-    // Move forward boost to clear carpark wall
-    Motor_forward_simple(TASK2_SPRINT_PWM, TASK2_SPRINT_PWM);
-    switch (TASK2_current_surface) {
-    case TASK2_SURFACE_HPL: {
-      if (initial_carpark_direction == '>')
-        HAL_Delay(270);
-      else
-        HAL_Delay(250);
-    } break;
-    case TASK2_SURFACE_OUTSIDE:
-      HAL_Delay(275);
-      break;
-    }
-    Motor_stop();
- // }
+  // Move forward boost to clear carpark wall
+  Motor_forward_simple(TASK2_SPRINT_PWM, TASK2_SPRINT_PWM);
+  switch (TASK2_current_surface) {
+  case TASK2_SURFACE_HPL: {
+    if (initial_carpark_direction == '>')
+      HAL_Delay(270);
+    else
+      HAL_Delay(250);
+  } break;
+  case TASK2_SURFACE_OUTSIDE:
+    HAL_Delay(275);
+    break;
+  }
+  Motor_stop();
+  // }
 
   // Turn into carpark bay in the final stretch
   if (initial_carpark_direction == '>') {
@@ -2092,7 +2083,7 @@ void task_two_clear_first_obs_alternate(int pwm,
 
   TASK2_vertical_first_part = 0;
 
-  // sprint forward                                      
+  // sprint forward
   Drive_Forward_Until_Obstacle(TASK2_SPRINT_PWM, obstacle_clearance_distance);
 
   TASK2_vertical_first_part += cm_travelled_forward();
@@ -2105,7 +2096,6 @@ void task_two_clear_first_obs_alternate(int pwm,
     Turn_Car(35, pwm, 45, 0);
     HAL_Delay(50);
     Motor_stop();
-
 
     // Track start side of obstacle 1
     do {
@@ -2125,10 +2115,10 @@ void task_two_clear_first_obs_alternate(int pwm,
     // Possible to send snapshot here to RPI
     // send_message_over("snap\n");
 
-     // 75, 70
+    // 75, 70
     Turn_Car(65, pwm, 45, 0);
     Motor_reverse_simple(pwm, pwm);
-    HAL_Delay(250); // 250 -> 450
+    HAL_Delay(250);            // 250 -> 450
     Turn_Car(50, pwm, -45, 0); // 60, 55
     HAL_Delay(50);
     // Motor_forward_simple(pwm, pwm);
@@ -2161,7 +2151,7 @@ void task_two_clear_first_obs_alternate(int pwm,
     reset_encoders();
     // Possible to send snapshot here to RPI
     // send_message_over("snap\n");
-//75
+    // 75
 
     // 75-70
     Turn_Car(65, pwm, -45, 0);
@@ -2179,8 +2169,8 @@ void task_two_clear_first_obs_alternate(int pwm,
   HAL_Delay(50);
   Motor_stop();
   TASK2_vertical_first_part_2 = cm_travelled_forward() +
-          obstacle_clearance_distance + 10 +
-          TASK2_distance_from_back_of_first_obs;
+                                obstacle_clearance_distance + 10 +
+                                TASK2_distance_from_back_of_first_obs;
 
   TASK2_vertical_dist_now += cm_travelled_forward() +
                              obstacle_clearance_distance + 10 +
@@ -2189,7 +2179,6 @@ void task_two_clear_first_obs_alternate(int pwm,
   HAL_Delay(150);
   Motor_stop();
 }
-
 
 void front_back_test() {
   int delay_btw_front_back = 5000;
@@ -2223,46 +2212,44 @@ void front_back_test() {
 }
 char task_two_uart() {
 
+  int cmd_i = 0;
+  char cmd[64];
+  uint32_t attempt_start = HAL_GetTick();
 
-      int cmd_i = 0;
-      char cmd[64]; 
-      uint32_t attempt_start = HAL_GetTick();
+  // Wait for X seconds between attempts
+  while (HAL_GetTick() - attempt_start < SNAP_WAIT_MS) {
 
-      // Wait for X seconds between attempts
-      while (HAL_GetTick() - attempt_start < SNAP_WAIT_MS) {
+    uint8_t ch;
+    if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
 
-        uint8_t ch;
-        if (HAL_UART_Receive(&huart3, &ch, 1, 1) == HAL_OK) {
+      if (ch == '\n' || ch == '\r') {
+        if (cmd_i > 0) {
+          cmd[cmd_i] = '\0';
 
-          if (ch == '\n' || ch == '\r') {
-            if (cmd_i > 0) {
-              cmd[cmd_i] = '\0';
-
-              char type;
-              sscanf(cmd, "%c", &type);
-              send_message_over(cmd);
-              if (type == '>' || type == '<' || type == 's') {
-                send_message_over("ACK\n");
-                return type;
-              } else {
-                send_message_over("error\n");
-                send_message_over("ACK\n");
-                cmd_i = 0;
-              }
-            }
+          char type;
+          sscanf(cmd, "%c", &type);
+          send_message_over(cmd);
+          if (type == '>' || type == '<' || type == 's') {
+            send_message_over("ACK\n");
+            return type;
           } else {
-            if (cmd_i < CMD_BUF_LEN - 1) {
-              cmd[cmd_i++] = ch;
-            }
+            send_message_over("error\n");
+            send_message_over("ACK\n");
+            cmd_i = 0;
           }
         }
+      } else {
+        if (cmd_i < CMD_BUF_LEN - 1) {
+          cmd[cmd_i++] = ch;
+        }
       }
+    }
+  }
 
   // Timeout case when both attempts fail
   send_message_over("timeout\n");
   return 0;
 }
-
 
 void testing(char direction_obs1) {
   // Turn_Car_Reverse(90,3000,45,0);
@@ -2270,30 +2257,29 @@ void testing(char direction_obs1) {
   // Turn_Car_Reverse(90,3000,-45,0);
   // front_back_test();
   // turning_test();
-//  if(direction_obs1 == '<'){
-//    Servo_SetAngle_Safe(-45,0);f
-//  }
-//  else if(direction_obs1 == '>'){
-//    Servo_SetAngle_Safe(45,0);
-//  }
- // HAL_Delay(1000);
-  // UART_arm(); // REMOVED: Since RxCpltCallback automatically re-arms, calling this again clears uart_rx_ready and drops characters received concurrently!
+  //  if(direction_obs1 == '<'){
+  //    Servo_SetAngle_Safe(-45,0);f
+  //  }
+  //  else if(direction_obs1 == '>'){
+  //    Servo_SetAngle_Safe(45,0);
+  //  }
+  // HAL_Delay(1000);
+  // UART_arm(); // REMOVED: Since RxCpltCallback automatically re-arms, calling
+  // this again clears uart_rx_ready and drops characters received concurrently!
   // Send to RPI to take picture
-  //send_message_over("snap\n");
-  //char direction_obs2 = task_two_uart();
-//  char direction_obs2 = '<';
-//  // while(direction_obs2 != '<' && direction_obs2 != '>'){
-//  //     direction_obs2 = UART_receive();
-//  // }
-//
-//  if(direction_obs2 == '<'){
-//    Servo_SetAngle_Safe(-45,0);
-//  }
-//  else if(direction_obs2 == '>'){
-//    Servo_SetAngle_Safe(45,0);
-//  }
-
-
+  // send_message_over("snap\n");
+  // char direction_obs2 = task_two_uart();
+  //  char direction_obs2 = '<';
+  //  // while(direction_obs2 != '<' && direction_obs2 != '>'){
+  //  //     direction_obs2 = UART_receive();
+  //  // }
+  //
+  //  if(direction_obs2 == '<'){
+  //    Servo_SetAngle_Safe(-45,0);
+  //  }
+  //  else if(direction_obs2 == '>'){
+  //    Servo_SetAngle_Safe(45,0);
+  //  }
 }
 
 /* USER CODE END 0 */
@@ -2418,7 +2404,9 @@ int main(void) {
   MotorDrive_enable();       // enable PWM needed to drive MotroDrive A and D
   millisOld = HAL_GetTick(); // get time value before starting - for PID
 
-  // UART_arm(); // Commented out because task_two_uart uses polling (HAL_UART_Receive), and UART_arm starts an interrupt that will cause HAL_BUSY
+  // UART_arm(); // Commented out because task_two_uart uses polling
+  // (HAL_UART_Receive), and UART_arm starts an interrupt that will cause
+  // HAL_BUSY
 
   Servo_SetAngle_Safe(0, 0);
   HAL_Delay(1000);
@@ -2430,21 +2418,22 @@ int main(void) {
 
   /****************************START************START*************START**********************
    */
-char start;
-// UART_arm();  // REMOVED: Rx interrupt is continuously running from the callback, calling this again clears receive flags!
-while(1){
-  start = task_two_uart();
-  // We can use 's' to start the testing, providing a default direction or skipping the first turn.
-  // Alternatively, just pass 's' to testing().
-  if(start == '<' || start == '>'){
-    task_two(start);
-    Motor_stop();
-    break;
+  char start;
+  // UART_arm();  // REMOVED: Rx interrupt is continuously running from the
+  // callback, calling this again clears receive flags!
+  while (1) {
+    start = task_two_uart();
+    // We can use 's' to start the testing, providing a default direction or
+    // skipping the first turn. Alternatively, just pass 's' to testing().
+    if (start == '<' || start == '>') {
+      task_two(start);
+      Motor_stop();
+      break;
+    }
   }
-}
-Motor_stop();
-  //task_two('>');
-  // uint32_t distance = HCSR04_Read();
+  Motor_stop();
+  // task_two('>');
+  //  uint32_t distance = HCSR04_Read();
 
   // sprintf(buf, "Dist: %lu cm", distance);
   // OLED_ShowString(0, 50, (uint8_t*)buf);

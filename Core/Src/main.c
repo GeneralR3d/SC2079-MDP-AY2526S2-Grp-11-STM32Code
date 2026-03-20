@@ -326,6 +326,15 @@ void Motor_reverse_simple(int pwmValL, int pwmValR) {
   OLED_ShowString(0, 10, buf);
 }
 
+void spin_back_right_on_the_spot(int pwmVal) {
+  Steering_ToUS(45);
+  // Left motor forward, right motor reverse → spins car right on the spot
+  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_3, pwmVal); // Motor A forward
+  __HAL_TIM_SetCompare(&htim4, TIM_CHANNEL_4, 0);
+  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_3, pwmVal); // Motor D reverse
+  __HAL_TIM_SetCompare(&htim1, TIM_CHANNEL_4, 0);
+}
+
 // THIS IS THE MOTOR FORWARD THAT IMPLEMENTS THE PID CONTROL
 static uint8_t motor_forward_needs_reset = 0;
 

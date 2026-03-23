@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ackermann Differential Steering — Interactive Simulation</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    background: #0f1117;
+    color: #e0e0e0;
+    overflow-x: hidden;
+  }
+  .layout {
+    display: flex;
+    height: 100vh;
+  }
+  .sidebar {
+    width: 340px;
+    min-width: 340px;
+    background: #161822;
+    border-right: 1px solid #2a2d3a;
+    padding: 20px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .sidebar h1 {
+    font-size: 18px;
+    color: #60a5fa;
+    margin-bottom: 4px;
+  }
+  .sidebar h2 {
+    font-size: 14px;
+    color: #93a3b8;
+    font-weight: 500;
+    margin-bottom: 8px;
+    border-bottom: 1px solid #2a2d3a;
+    padding-bottom: 6px;
+  }
+  .control-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .control-group label {
+    font-size: 12px;
+    color: #9ca3af;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .control-group label span.val {
+    color: #60a5fa;
+    font-weight: 600;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 12px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    width: 100%;
+    height: 6px;
+    background: #2a2d3a;
+    border-radius: 3px;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #60a5fa;
+    cursor: pointer;
+  }
+  .readout-box {
+    background: #1e2030;
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 12px;
+    line-height: 1.8;
+    font-family: 'SF Mono', 'Consolas', monospace;
+  }
+  .readout-box .label { color: #6b7280; }
+  .readout-box .value { color: #f0f0f0; font-weight: 600; }
+  .readout-box .inner { color: #f59e0b; }
+  .readout-box .outer { color: #10b981; }
+  .readout-box .icr { color: #f472b6; }
+  .legend {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 11px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .legend-swatch {
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .canvas-area {
+    flex: 1;
+    position: relative;
+    background: #13151f;
+  }
+  canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+  }
+  .info-banner {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(22, 24, 34, 0.92);
+    border: 1px solid #2a2d3a;
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-size: 12px;
+    color: #9ca3af;
+    white-space: nowrap;
+  }
+  .toggle-row {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .toggle-btn {
+    font-size: 11px;
+    padding: 4px 10px;
+    border-radius: 4px;
+    border: 1px solid #2a2d3a;
+    background: #1e2030;
+    color: #9ca3af;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .toggle-btn.active {
+    background: #60a5fa22;
+    border-color: #60a5fa;
+    color: #60a5fa;
+  }
+  .concept-box {
+    background: #1a1c2e;
+    border-left: 3px solid #60a5fa;
+    border-radius: 0 6px 6px 0;
+    padding: 10px 12px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    color: #b0b8c8;
+  }
+  .concept-box strong { color: #e0e0e0; }
+  .btn-primary {
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background: #60a5fa;
+    color: #0f1117;
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn-primary:hover { background: #7db8fc; }
+  .btn-row { display: flex; gap: 8px; }
+</style>
+</head>
+<body>
+<div class="layout">
+  <!-- Sidebar Controls -->
+  <div class="sidebar">
+    <div>
+      <h1>Ackermann Steering</h1>
+      <p style="font-size:12px;color:#6b7280;margin-top:4px;">Interactive simulation for a 4-wheel differential-drive robot</p>
+    </div>
+
+    <div class="concept-box">
+      <strong>Key Insight:</strong> When a car turns, each wheel traces a circle of different radius — but all circles share the <strong style="color:#f472b6">same center</strong> (the ICR).
+      The inner front wheel must steer at a <strong style="color:#f59e0b">sharper angle</strong> than the outer wheel, and the inner rear wheel must spin <strong style="color:#f59e0b">slower</strong> than the outer.
+      This is the <strong>Ackermann condition</strong>.
+    </div>
+
+    <h2>Vehicle Parameters</h2>
+    <div class="control-group">
+      <label>Wheelbase (L) <span class="val" id="wb-val">120 px</span></label>
+      <input type="range" id="wheelbase" min="60" max="200" value="120">
+    </div>
+    <div class="control-group">
+      <label>Track Width (W) <span class="val" id="tw-val">90 px</span></label>
+      <input type="range" id="trackwidth" min="40" max="160" value="90">
+    </div>
+    <div class="control-group">
+      <label>Steering Angle (δ) <span class="val" id="sa-val">25°</span></label>
+      <input type="range" id="steerangle" min="5" max="50" value="25" step="0.5">
+    </div>
+    <div class="control-group">
+      <label>Speed <span class="val" id="sp-val">0.4</span></label>
+      <input type="range" id="speed" min="0" max="1" value="0.4" step="0.05">
+    </div>
+
+    <h2>Display</h2>
+    <div class="toggle-row">
+      <button class="toggle-btn active" data-layer="circles">Wheel Circles</button>
+      <button class="toggle-btn active" data-layer="icr">ICR Point</button>
+      <button class="toggle-btn active" data-layer="radii">Radii Lines</button>
+      <button class="toggle-btn active" data-layer="angles">Angle Arcs</button>
+      <button class="toggle-btn active" data-layer="speeds">Speed Bars</button>
+      <button class="toggle-btn active" data-layer="trails">Wheel Trails</button>
+      <button class="toggle-btn active" data-layer="labels">Labels</button>
+    </div>
+
+    <h2>Computed Values</h2>
+    <div class="readout-box" id="readouts">
+      <!-- filled by JS -->
+    </div>
+
+    <h2>Legend</h2>
+    <div class="legend">
+      <div class="legend-item"><div class="legend-swatch" style="background:#f59e0b"></div>Inner wheels (right)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#10b981"></div>Outer wheels (left)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#f472b6"></div>ICR — Instantaneous Center of Rotation</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#60a5fa"></div>Rear axle turning radius (R)</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:#8b5cf6"></div>Vehicle body &amp; axles</div>
+      <div class="legend-item"><div class="legend-swatch" style="background:rgba(255,255,255,0.15)"></div>Wheel trails (path history)</div>
+    </div>
+
+    <div class="concept-box" style="border-left-color:#f59e0b;">
+      <strong>Why "Ackermann"?</strong><br>
+      Without Ackermann geometry, front wheels would fight each other — one would scrub sideways, wasting energy and wearing tyres.
+      The trapezoid linkage ensures both front axle extensions <em>intersect the rear axle line</em> at the ICR.
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-primary" id="btn-reset">Reset View</button>
+      <button class="btn-primary" id="btn-pause" style="background:#374151;color:#e0e0e0;">⏸ Pause</button>
+    </div>
+  </div>
+
+  <!-- Canvas -->
+  <div class="canvas-area">
+    <canvas id="sim"></canvas>
+    <div class="info-banner">Drag to pan · Scroll to zoom · Adjust sliders to explore</div>
+  </div>
+</div>
+
+<script>
+// ─── Setup ───
+const canvas = document.getElementById('sim');
+const ctx = canvas.getContext('2d');
+let W, H, dpr;
+
+function resize() {
+  const rect = canvas.parentElement.getBoundingClientRect();
+  dpr = window.devicePixelRatio || 1;
+  W = rect.width;
+  H = rect.height;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─── State ───
+const sliders = {
+  wheelbase: document.getElementById('wheelbase'),
+  trackwidth: document.getElementById('trackwidth'),
+  steerangle: document.getElementById('steerangle'),
+  speed: document.getElementById('speed'),
+};
+const valLabels = {
+  wheelbase: document.getElementById('wb-val'),
+  trackwidth: document.getElementById('tw-val'),
+  steerangle: document.getElementById('sa-val'),
+  speed: document.getElementById('sp-val'),
+};
+
+const layers = { circles: true, icr: true, radii: true, angles: true, speeds: true, trails: true, labels: true };
+
+document.querySelectorAll('.toggle-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const key = btn.dataset.layer;
+    layers[key] = !layers[key];
+    btn.classList.toggle('active', layers[key]);
+  });
+});
+
+let paused = false;
+document.getElementById('btn-pause').addEventListener('click', function () {
+  paused = !paused;
+  this.textContent = paused ? '▶ Play' : '⏸ Pause';
+});
+
+// Camera
+let camX = 0, camY = 0, camZoom = 1;
+let dragging = false, dragStartX, dragStartY, camStartX, camStartY;
+canvas.addEventListener('mousedown', e => { dragging = true; dragStartX = e.clientX; dragStartY = e.clientY; camStartX = camX; camStartY = camY; });
+window.addEventListener('mousemove', e => { if (!dragging) return; camX = camStartX + (e.clientX - dragStartX); camY = camStartY + (e.clientY - dragStartY); });
+window.addEventListener('mouseup', () => { dragging = false; });
+canvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const factor = e.deltaY < 0 ? 1.08 : 1 / 1.08;
+  // Zoom toward mouse
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+  camX = mx - (mx - camX) * factor;
+  camY = my - (my - camY) * factor;
+  camZoom *= factor;
+}, { passive: false });
+
+document.getElementById('btn-reset').addEventListener('click', () => {
+  camX = 0; camY = 0; camZoom = 1;
+  carAngle = 0;
+  trails = [[], [], [], []];
+});
+
+// ─── Car state ───
+let carAngle = 0; // radians, around ICR
+let trails = [[], [], [], []]; // FL, FR, RL, RR
+
+// ─── Helpers ───
+function deg2rad(d) { return d * Math.PI / 180; }
+function rad2deg(r) { return r * 180 / Math.PI; }
+
+function drawArrow(x1, y1, x2, y2, color, width) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return;
+  const ux = dx / len, uy = dy / len;
+  const headLen = Math.min(10, len * 0.3);
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2, y2);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = width;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * ux + headLen * 0.4 * uy, y2 - headLen * uy - headLen * 0.4 * ux);
+  ctx.lineTo(x2 - headLen * ux - headLen * 0.4 * uy, y2 - headLen * uy + headLen * 0.4 * ux);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
+}
+
+function drawAngleArc(cx, cy, r, startAngle, endAngle, color, labelText) {
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, startAngle, endAngle, endAngle < startAngle);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Label at midpoint
+  if (layers.labels) {
+    const mid = (startAngle + endAngle) / 2;
+    const lx = cx + (r + 14) * Math.cos(mid);
+    const ly = cy + (r + 14) * Math.sin(mid);
+    ctx.font = '12px "SF Mono", Consolas, monospace';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(labelText, lx, ly);
+  }
+}
+
+// ─── Main loop ───
+let lastTime = 0;
+const TRAIL_MAX = 2000;
+
+function frame(ts) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  // Read params
+  const L = +sliders.wheelbase.value;
+  const Tw = +sliders.trackwidth.value;
+  const deltaAvg = deg2rad(+sliders.steerangle.value);
+  const speed = +sliders.speed.value;
+
+  valLabels.wheelbase.textContent = L + ' px';
+  valLabels.trackwidth.textContent = Tw + ' px';
+  valLabels.steerangle.textContent = (+sliders.steerangle.value).toFixed(1) + '°';
+  valLabels.speed.textContent = speed.toFixed(2);
+
+  // ─── Ackermann geometry (turning RIGHT → ICR is to the right of the car) ───
+  const R = L / Math.tan(deltaAvg); // rear axle center turning radius
+
+  // Inner (right) and outer (left) front steer angles
+  const deltaInner = Math.atan(L / (R - Tw / 2));
+  const deltaOuter = Math.atan(L / (R + Tw / 2));
+
+  // Radii from ICR to each wheel
+  const rRL = R + Tw / 2;   // rear left (outer)
+  const rRR = R - Tw / 2;   // rear right (inner)
+  const rFL = Math.sqrt(L * L + (R + Tw / 2) ** 2); // front left
+  const rFR = Math.sqrt(L * L + (R - Tw / 2) ** 2); // front right
+
+  // Wheel linear speeds (proportional to radius)
+  const omega = speed * 0.5 / Math.max(R, 1); // angular velocity
+  const vRL = omega * rRL;
+  const vRR = omega * rRR;
+  const vFL = omega * rFL;
+  const vFR = omega * rFR;
+
+  // Update car angle
+  if (!paused) {
+    carAngle -= omega * dt * 60;
+  }
+
+  // ICR in world = origin. Car rear axle center orbits ICR at radius R.
+  // We place ICR at a nice spot on screen.
+  const icrScreenX = W / 2;
+  const icrScreenY = H / 2;
+
+  // Positions relative to ICR (car turning right, ICR to the right)
+  // Rear axle center at angle carAngle, distance R to the LEFT of ICR
+  // In our coord: ICR is at (0,0). Rear axle center orbits at distance R.
+  // Car heading is perpendicular to the radius line.
+  const raCX = -R * Math.cos(carAngle);  // rear axle center x
+  const raCY = -R * Math.sin(carAngle);
+  const heading = carAngle + Math.PI / 2; // car forward direction
+
+  // Perpendicular (rightward from car's perspective)
+  const perpX = Math.cos(carAngle);
+  const perpY = Math.sin(carAngle);
+  // Forward
+  const fwdX = Math.cos(heading);
+  const fwdY = Math.sin(heading);
+
+  // Four wheel positions in world
+  const wheels = [
+    { // FL (outer)
+      x: raCX + fwdX * L - perpX * Tw / 2,
+      y: raCY + fwdY * L - perpY * Tw / 2,
+      steer: deltaOuter, r: rFL, v: vFL, color: '#10b981', label: 'FL (outer)'
+    },
+    { // FR (inner)
+      x: raCX + fwdX * L + perpX * Tw / 2,
+      y: raCY + fwdY * L + perpY * Tw / 2,
+      steer: deltaInner, r: rFR, v: vFR, color: '#f59e0b', label: 'FR (inner)'
+    },
+    { // RL (outer)
+      x: raCX - perpX * Tw / 2,
+      y: raCY - perpY * Tw / 2,
+      steer: 0, r: rRL, v: vRL, color: '#10b981', label: 'RL (outer)'
+    },
+    { // RR (inner)
+      x: raCX + perpX * Tw / 2,
+      y: raCY + perpY * Tw / 2,
+      steer: 0, r: rRR, v: vRR, color: '#f59e0b', label: 'RR (inner)'
+    }
+  ];
+
+  // Record trails
+  if (!paused && speed > 0) {
+    for (let i = 0; i < 4; i++) {
+      trails[i].push({ x: wheels[i].x, y: wheels[i].y });
+      if (trails[i].length > TRAIL_MAX) trails[i].shift();
+    }
+  }
+
+  // ─── Render ───
+  ctx.save();
+  ctx.clearRect(0, 0, W, H);
+
+  // Apply camera
+  ctx.translate(icrScreenX + camX, icrScreenY + camY);
+  ctx.scale(camZoom, camZoom);
+
+  // Grid
+  const gridStep = 50;
+  const gridExtent = 2000;
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let g = -gridExtent; g <= gridExtent; g += gridStep) {
+    ctx.beginPath(); ctx.moveTo(g, -gridExtent); ctx.lineTo(g, gridExtent); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(-gridExtent, g); ctx.lineTo(gridExtent, g); ctx.stroke();
+  }
+
+  // ─── Wheel circles ───
+  if (layers.circles) {
+    for (const w of wheels) {
+      ctx.beginPath();
+      ctx.arc(0, 0, w.r, 0, Math.PI * 2);
+      ctx.strokeStyle = w.color + '30';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Rear axle center circle
+    ctx.beginPath();
+    ctx.arc(0, 0, R, 0, Math.PI * 2);
+    ctx.strokeStyle = '#60a5fa40';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([10, 6]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ─── Trails ───
+  if (layers.trails) {
+    const trailColors = ['#10b98140', '#f59e0b40', '#10b98140', '#f59e0b40'];
+    for (let i = 0; i < 4; i++) {
+      if (trails[i].length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(trails[i][0].x, trails[i][0].y);
+      for (let j = 1; j < trails[i].length; j++) {
+        ctx.lineTo(trails[i][j].x, trails[i][j].y);
+      }
+      ctx.strokeStyle = trailColors[i];
+      ctx.lineWidth = 3;
+      ctx.stroke();
+    }
+  }
+
+  // ─── Radii lines from ICR to wheels ───
+  if (layers.radii) {
+    for (const w of wheels) {
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(w.x, w.y);
+      ctx.strokeStyle = w.color + '55';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    // Radius to rear axle center (R)
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(raCX, raCY);
+    ctx.strokeStyle = '#60a5fa88';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 3]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // ─── ICR point ───
+  if (layers.icr) {
+    // Pulsing halo
+    const pulse = 0.5 + 0.5 * Math.sin(ts / 300);
+    ctx.beginPath();
+    ctx.arc(0, 0, 12 + pulse * 6, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(244, 114, 182, ${0.1 + pulse * 0.08})`;
+    ctx.fill();
+    // Dot
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#f472b6';
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Crosshairs
+    ctx.strokeStyle = '#f472b666';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(-18, 0); ctx.lineTo(18, 0); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, -18); ctx.lineTo(0, 18); ctx.stroke();
+    if (layers.labels) {
+      ctx.font = 'bold 13px "SF Mono", Consolas, monospace';
+      ctx.fillStyle = '#f472b6';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('ICR', 14, -10);
+      ctx.font = '10px "SF Mono", Consolas, monospace';
+      ctx.fillStyle = '#f472b688';
+      ctx.fillText('(Instantaneous Center', 14, 4);
+      ctx.fillText(' of Rotation)', 14, 16);
+    }
+  }
+
+  // ─── Car body ───
+  ctx.save();
+  // Draw car body as a filled rectangle
+  const bodyPad = 10;
+  const corners = [
+    { x: raCX + fwdX * (L + bodyPad) - perpX * (Tw / 2 + bodyPad), y: raCY + fwdY * (L + bodyPad) - perpY * (Tw / 2 + bodyPad) },
+    { x: raCX + fwdX * (L + bodyPad) + perpX * (Tw / 2 + bodyPad), y: raCY + fwdY * (L + bodyPad) + perpY * (Tw / 2 + bodyPad) },
+    { x: raCX - fwdX * bodyPad + perpX * (Tw / 2 + bodyPad), y: raCY - fwdY * bodyPad + perpY * (Tw / 2 + bodyPad) },
+    { x: raCX - fwdX * bodyPad - perpX * (Tw / 2 + bodyPad), y: raCY - fwdY * bodyPad - perpY * (Tw / 2 + bodyPad) },
+  ];
+  ctx.beginPath();
+  ctx.moveTo(corners[0].x, corners[0].y);
+  ctx.lineTo(corners[1].x, corners[1].y);
+  ctx.lineTo(corners[2].x, corners[2].y);
+  ctx.lineTo(corners[3].x, corners[3].y);
+  ctx.closePath();
+  ctx.fillStyle = '#8b5cf620';
+  ctx.fill();
+  ctx.strokeStyle = '#8b5cf6';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Front axle line
+  ctx.beginPath();
+  ctx.moveTo(wheels[0].x, wheels[0].y);
+  ctx.lineTo(wheels[1].x, wheels[1].y);
+  ctx.strokeStyle = '#8b5cf688';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Rear axle line
+  ctx.beginPath();
+  ctx.moveTo(wheels[2].x, wheels[2].y);
+  ctx.lineTo(wheels[3].x, wheels[3].y);
+  ctx.strokeStyle = '#8b5cf688';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Center line (wheelbase)
+  ctx.beginPath();
+  ctx.moveTo(raCX, raCY);
+  ctx.lineTo(raCX + fwdX * L, raCY + fwdY * L);
+  ctx.strokeStyle = '#8b5cf644';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Direction arrow on car body
+  const arrowStart = { x: raCX + fwdX * L * 0.3, y: raCY + fwdY * L * 0.3 };
+  const arrowEnd = { x: raCX + fwdX * (L + 30), y: raCY + fwdY * (L + 30) };
+  drawArrow(arrowStart.x, arrowStart.y, arrowEnd.x, arrowEnd.y, '#8b5cf6aa', 2);
+
+  ctx.restore();
+
+  // ─── Wheels ───
+  const wheelLen = 20;
+  const wheelWid = 8;
+  for (let i = 0; i < 4; i++) {
+    const w = wheels[i];
+    ctx.save();
+    ctx.translate(w.x, w.y);
+    // Wheel rotation = heading + steer angle
+    let wheelAngle = heading;
+    if (i < 2) { // front wheels steer toward the right (toward ICR)
+      wheelAngle = heading - w.steer;
+    }
+    ctx.rotate(wheelAngle);
+    // Wheel rectangle
+    ctx.fillStyle = w.color;
+    ctx.fillRect(-wheelLen / 2, -wheelWid / 2, wheelLen, wheelWid);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-wheelLen / 2, -wheelWid / 2, wheelLen, wheelWid);
+    // Direction tick
+    ctx.beginPath();
+    ctx.moveTo(wheelLen / 2 - 3, 0);
+    ctx.lineTo(wheelLen / 2 + 4, 0);
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+
+    // Wheel label
+    if (layers.labels) {
+      ctx.font = '11px "SF Mono", Consolas, monospace';
+      ctx.fillStyle = w.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(w.label, w.x, w.y - 14);
+    }
+  }
+
+  // ─── Rear axle extension line to ICR (showing geometry) ───
+  if (layers.radii) {
+    // Extend rear axle line to ICR — this is the key Ackermann line
+    ctx.beginPath();
+    ctx.moveTo(wheels[2].x, wheels[2].y);
+    ctx.lineTo(0, 0); // ICR
+    ctx.lineTo(wheels[3].x, wheels[3].y);
+    ctx.strokeStyle = '#60a5fa33';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // ─── Front wheel axle extensions to ICR (Ackermann condition) ───
+  if (layers.radii) {
+    // The key Ackermann insight: lines through each front wheel perpendicular
+    // to their steering direction should intersect at ICR
+    // We show the line from each front wheel along its axle to ICR
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(wheels[i].x, wheels[i].y);
+      ctx.lineTo(0, 0);
+      ctx.strokeStyle = wheels[i].color + '33';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // ─── Angle arcs at front wheels ───
+  if (layers.angles) {
+    const arcR = 30;
+    // Inner (FR)
+    const innerBase = heading; // car heading
+    const innerEnd = heading - deltaInner;
+    drawAngleArc(wheels[1].x, wheels[1].y, arcR, innerEnd, innerBase, '#f59e0b',
+      'δᵢ=' + rad2deg(deltaInner).toFixed(1) + '°');
+    // Outer (FL)
+    const outerEnd = heading - deltaOuter;
+    drawAngleArc(wheels[0].x, wheels[0].y, arcR, outerEnd, innerBase, '#10b981',
+      'δₒ=' + rad2deg(deltaOuter).toFixed(1) + '°');
+  }
+
+  // ─── Speed bars ───
+  if (layers.speeds) {
+    const maxBarH = 40;
+    const maxV = Math.max(vFL, vFR, vRL, vRR, 0.001);
+    for (let i = 0; i < 4; i++) {
+      const w = wheels[i];
+      const barH = (w.v / maxV) * maxBarH;
+      const bx = w.x + perpX * (i % 2 === 0 ? -22 : 22);
+      const by = w.y + perpY * (i % 2 === 0 ? -22 : 22);
+      // Bar background
+      ctx.fillStyle = 'rgba(255,255,255,0.08)';
+      ctx.fillRect(bx - 3, by - maxBarH, 6, maxBarH);
+      // Bar fill
+      ctx.fillStyle = w.color + 'cc';
+      ctx.fillRect(bx - 3, by - barH, 6, barH);
+      // Speed value
+      if (layers.labels) {
+        ctx.font = '9px "SF Mono", Consolas, monospace';
+        ctx.fillStyle = w.color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillText(w.v.toFixed(2), bx, by - maxBarH - 3);
+      }
+    }
+  }
+
+  // ─── Dimension annotations ───
+  if (layers.labels) {
+    // Wheelbase label
+    const wbMidX = raCX + fwdX * L / 2 - perpX * (Tw / 2 + 30);
+    const wbMidY = raCY + fwdY * L / 2 - perpY * (Tw / 2 + 30);
+    ctx.font = '11px "SF Mono", Consolas, monospace';
+    ctx.fillStyle = '#60a5fa';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('L=' + L, wbMidX, wbMidY);
+
+    // Track width label
+    const twMidX = raCX - fwdX * 20;
+    const twMidY = raCY - fwdY * 20;
+    ctx.fillText('W=' + Tw, twMidX, twMidY);
+
+    // Turning radius label
+    const rLabelAngle = carAngle + 0.15;
+    const rLabelX = R / 2 * Math.cos(rLabelAngle + Math.PI);
+    const rLabelY = R / 2 * Math.sin(rLabelAngle + Math.PI);
+    ctx.font = 'bold 12px "SF Mono", Consolas, monospace';
+    ctx.fillStyle = '#60a5fa';
+    ctx.fillText('R=' + R.toFixed(0), rLabelX, rLabelY);
+  }
+
+  ctx.restore();
+
+  // ─── Readouts ───
+  const readoutsEl = document.getElementById('readouts');
+  readoutsEl.innerHTML =
+    `<span class="label">Turning radius (R):</span> <span class="value" style="color:#60a5fa">${R.toFixed(1)} px</span><br>` +
+    `<span class="label">Angular velocity (ω):</span> <span class="value">${omega.toFixed(4)} rad/f</span><br>` +
+    `<br>` +
+    `<span class="label">─ Front Inner (FR) ─</span><br>` +
+    `<span class="label">  Steer angle δᵢ:</span> <span class="inner">${rad2deg(deltaInner).toFixed(2)}°</span><br>` +
+    `<span class="label">  Radius:</span> <span class="inner">${rFR.toFixed(1)} px</span><br>` +
+    `<span class="label">  Speed:</span> <span class="inner">${vFR.toFixed(3)}</span><br>` +
+    `<br>` +
+    `<span class="label">─ Front Outer (FL) ─</span><br>` +
+    `<span class="label">  Steer angle δₒ:</span> <span class="outer">${rad2deg(deltaOuter).toFixed(2)}°</span><br>` +
+    `<span class="label">  Radius:</span> <span class="outer">${rFL.toFixed(1)} px</span><br>` +
+    `<span class="label">  Speed:</span> <span class="outer">${vFL.toFixed(3)}</span><br>` +
+    `<br>` +
+    `<span class="label">─ Rear Inner (RR) ─</span><br>` +
+    `<span class="label">  Radius:</span> <span class="inner">${rRR.toFixed(1)} px</span><br>` +
+    `<span class="label">  Speed:</span> <span class="inner">${vRR.toFixed(3)}</span><br>` +
+    `<br>` +
+    `<span class="label">─ Rear Outer (RL) ─</span><br>` +
+    `<span class="label">  Radius:</span> <span class="outer">${rRL.toFixed(1)} px</span><br>` +
+    `<span class="label">  Speed:</span> <span class="outer">${vRL.toFixed(3)}</span><br>` +
+    `<br>` +
+    `<span class="label">Speed ratio (inner/outer):</span><br>` +
+    `<span class="label">  Rear:</span> <span class="value">${(vRR / Math.max(vRL, 0.001)).toFixed(4)}</span><br>` +
+    `<span class="label">  Front:</span> <span class="value">${(vFR / Math.max(vFL, 0.001)).toFixed(4)}</span><br>` +
+    `<br>` +
+    `<span class="label">Ackermann check:</span><br>` +
+    `<span class="label">  cot(δₒ)−cot(δᵢ):</span> <span class="value">${(1/Math.tan(deltaOuter) - 1/Math.tan(deltaInner)).toFixed(4)}</span><br>` +
+    `<span class="label">  W/L:</span> <span class="value">${(Tw/L).toFixed(4)}</span><br>` +
+    `<span class="label">  Match:</span> <span class="value" style="color:#10b981">✓ cot(δₒ)−cot(δᵢ) = W/L</span>`;
+}
+
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

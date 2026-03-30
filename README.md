@@ -4,7 +4,7 @@
 
 ## What is this?
 
-The NUS SC2079 Multi-Disciplinary Project (MDP) challenges teams to build a fully autonomous robot that can navigate a physical obstacle course guided by a Raspberry Pi vision system. The STM32 is the motion-control brain: it receives obstacle directions from the Pi over UART (`<` = left, `>` = right), executes the avoidance sequence with millimeter-class precision, and sends back status messages (`ACK`, `snap`, `END`) to coordinate the RPi image-capture pipeline.
+The NTU SC2079 Multi-Disciplinary Project (MDP) challenges teams to build a fully autonomous robot that can navigate a physical obstacle course guided by a Raspberry Pi vision system. The STM32 is the motion-control brain: it receives obstacle directions from the Pi over UART (`<` = left, `>` = right), executes the avoidance sequence with millimeter-class precision, and sends back status messages (`ACK`, `snap`, `END`) to coordinate the RPi image-capture pipeline.
 
 Task 2 is the hardest scenario: the car must approach Obstacle 1, dodge it using gyro turns and IR tracking, re-align to Obstacle 2, perform a 180° reversal around it, then arc back into the carpark bay — stopping flush against the rear wall based on live ultrasonic distance. Every maneuver is closed-loop; there are no fixed time delays for navigation.
 

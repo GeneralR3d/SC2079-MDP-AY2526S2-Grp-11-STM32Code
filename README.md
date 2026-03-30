@@ -231,4 +231,4 @@ On timeout (8 s with one retry) the STM32 sends `"timeout\n"` and defaults to `'
 
 ## License
 
-Academic project — NUS SC2079 AY2526 Semester 2, Group 11.
+Academic project — NTU SC2079 AY2526 Semester 2, Group 11.
